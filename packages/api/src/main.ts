@@ -68,9 +68,10 @@ async function bootstrap() {
     }) as any,
   );
 
-  await app.listen({ port: 3000, host: '0.0.0.0' });
-  console.log(`AlgoArena API running on http://0.0.0.0:3000/${API_PREFIX}`);
-  console.log(`API docs available at http://0.0.0.0:3000/docs`);
+  const port = parseInt(process.env.PORT || '3000', 10);
+  await app.listen({ port, host: '0.0.0.0' });
+  console.log(`AlgoArena API running on http://0.0.0.0:${port}/${API_PREFIX}`);
+  console.log(`API docs available at http://0.0.0.0:${port}/docs`);
 }
 
 bootstrap();
