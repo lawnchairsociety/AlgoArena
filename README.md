@@ -38,6 +38,7 @@ All endpoints are prefixed with `/api/v1`. Four auth levels:
 
 ### Key Endpoints
 
+- `GET /health` — Health check (no auth required)
 - `POST /trading/orders` — Place an order (market, limit, stop, stop-limit)
 - `GET /portfolio/account` — Account summary (cash, equity, P&L, day trade count)
 - `GET /portfolio/positions` — Current positions with unrealized P&L
@@ -55,6 +56,8 @@ Per-CUID, enforced via Valkey:
 | Market Data | 120 req/min |
 | Portfolio | 60 req/min |
 | Trading | 30 req/min |
+
+Every throttled response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers for client-side self-throttling.
 
 ## Order Simulation
 
