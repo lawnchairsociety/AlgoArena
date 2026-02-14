@@ -1,28 +1,22 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { eq, and, sql, isNull, asc } from 'drizzle-orm';
-import Decimal from 'decimal.js';
 import {
-  INITIAL_MARGIN_REQUIREMENT,
   BORROW_RATE_EASY,
   BORROW_RATE_MODERATE,
+  INITIAL_MARGIN_REQUIREMENT,
+  OrderSide,
+  OrderType,
 } from '@algoarena/shared';
-import type { OrderSide, OrderType } from '@algoarena/shared';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import Decimal from 'decimal.js';
+import { and, asc, eq, isNull } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleProvider } from '../database/drizzle.provider';
-import {
-  orders,
-  fills,
-  positions,
-  borrows,
-  borrowFeeTiers,
-  cuidUsers,
-} from '../database/schema';
-import { PdtService } from './pdt.service';
-import { MarketDataService } from '../market-data/market-data.service';
-import type { Quote, Asset } from '../market-data/types/market-data-provider.types';
-import type { OrderEventPayload, PdtWarningPayload } from '../websocket/ws-event.types';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '../database/schema';
+import { borrowFeeTiers, borrows, cuidUsers, fills, orders, positions } from '../database/schema';
+import { MarketDataService } from '../market-data/market-data.service';
+import { Quote } from '../market-data/types/market-data-provider.types';
+import { OrderEventPayload, PdtWarningPayload } from '../websocket/ws-event.types';
+import { PdtService } from './pdt.service';
 
 type Tx = Parameters<Parameters<NodePgDatabase<typeof schema>['transaction']>[0]>[0];
 
@@ -34,8 +28,6 @@ interface FillParams {
 
 @Injectable()
 export class OrderEngineService {
-  private readonly logger = new Logger(OrderEngineService.name);
-
   constructor(
     private readonly drizzle: DrizzleProvider,
     private readonly pdtService: PdtService,
@@ -56,22 +48,14 @@ export class OrderEngineService {
 
     await this.drizzle.db.transaction(async (tx) => {
       // 1. Lock the order row
-      const [order] = await tx
-        .select()
-        .from(orders)
-        .where(eq(orders.id, orderId))
-        .for('update');
+      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update');
 
       if (!order || (order.status !== 'pending' && order.status !== 'partially_filled')) {
         throw new BadRequestException(`Order ${orderId} is not fillable (status: ${order?.status})`);
       }
 
       // 2. Lock the user row
-      const [user] = await tx
-        .select()
-        .from(cuidUsers)
-        .where(eq(cuidUsers.id, order.cuidUserId))
-        .for('update');
+      const [user] = await tx.select().from(cuidUsers).where(eq(cuidUsers.id, order.cuidUserId)).for('update');
 
       if (!user) {
         throw new BadRequestException('User not found');
@@ -79,28 +63,18 @@ export class OrderEngineService {
 
       // 3. Lock the position row (if exists)
       const positionId = `${order.cuidUserId}:${order.symbol.toUpperCase()}`;
-      const [existingPosition] = await tx
-        .select()
-        .from(positions)
-        .where(eq(positions.id, positionId))
-        .for('update');
+      const [existingPosition] = await tx.select().from(positions).where(eq(positions.id, positionId)).for('update');
 
       // 4. Re-check buying power at fill time
       const cash = new Decimal(user.cashBalance);
       const marginUsed = new Decimal(user.marginUsed);
       const totalCost = fillPrice.mul(fillQuantity);
-      const currentPositionQty = existingPosition
-        ? new Decimal(existingPosition.quantity)
-        : new Decimal(0);
+      const currentPositionQty = existingPosition ? new Decimal(existingPosition.quantity) : new Decimal(0);
 
       // Determine if this is a short sell or a cover
-      const isShortSell =
-        order.side === 'sell' &&
-        currentPositionQty.lte(0); // no long or already short
+      const isShortSell = order.side === 'sell' && currentPositionQty.lte(0); // no long or already short
       const isPartialShortSell =
-        order.side === 'sell' &&
-        currentPositionQty.gt(0) &&
-        fillQuantity.gt(currentPositionQty); // selling more than long position
+        order.side === 'sell' && currentPositionQty.gt(0) && fillQuantity.gt(currentPositionQty); // selling more than long position
 
       if (order.side === 'buy') {
         const isCover = currentPositionQty.lt(0);
@@ -126,12 +100,8 @@ export class OrderEngineService {
           }
         } else {
           // Short sell — verify margin
-          const shortQty = isPartialShortSell
-            ? fillQuantity.minus(currentPositionQty)
-            : fillQuantity;
-          const marginRequired = fillPrice
-            .mul(shortQty)
-            .mul(INITIAL_MARGIN_REQUIREMENT);
+          const shortQty = isPartialShortSell ? fillQuantity.minus(currentPositionQty) : fillQuantity;
+          const marginRequired = fillPrice.mul(shortQty).mul(INITIAL_MARGIN_REQUIREMENT);
           const availableMargin = cash.minus(marginUsed);
           if (availableMargin.lt(marginRequired)) {
             throw new BadRequestException(
@@ -159,15 +129,10 @@ export class OrderEngineService {
 
       // Calculate new average fill price
       const prevFilledQty = new Decimal(order.filledQuantity);
-      const prevAvgPrice = order.avgFillPrice
-        ? new Decimal(order.avgFillPrice)
-        : new Decimal(0);
+      const prevAvgPrice = order.avgFillPrice ? new Decimal(order.avgFillPrice) : new Decimal(0);
       const newAvgFillPrice = prevFilledQty.isZero()
         ? fillPrice
-        : prevAvgPrice
-            .mul(prevFilledQty)
-            .plus(fillPrice.mul(fillQuantity))
-            .div(newFilledQty);
+        : prevAvgPrice.mul(prevFilledQty).plus(fillPrice.mul(fillQuantity)).div(newFilledQty);
 
       await tx
         .update(orders)
@@ -342,9 +307,7 @@ export class OrderEngineService {
     existingPosition: typeof positions.$inferSelect | undefined,
   ): Promise<void> {
     const positionId = `${cuidUserId}:${symbol}`;
-    const currentQty = existingPosition
-      ? new Decimal(existingPosition.quantity)
-      : new Decimal(0);
+    const currentQty = existingPosition ? new Decimal(existingPosition.quantity) : new Decimal(0);
 
     let newQty: Decimal;
     let newAvgCostBasis: Decimal;
@@ -416,8 +379,8 @@ export class OrderEngineService {
         .update(positions)
         .set({
           quantity: newQty.toFixed(6),
-          avgCostBasis: newAvgCostBasis!.toFixed(4),
-          totalCostBasis: newTotalCostBasis!.toFixed(2),
+          avgCostBasis: newAvgCostBasis?.toFixed(4),
+          totalCostBasis: newTotalCostBasis?.toFixed(2),
           updatedAt: new Date(),
         })
         .where(eq(positions.id, positionId));
@@ -427,8 +390,8 @@ export class OrderEngineService {
         cuidUserId,
         symbol,
         quantity: newQty.toFixed(6),
-        avgCostBasis: newAvgCostBasis!.toFixed(4),
-        totalCostBasis: newTotalCostBasis!.toFixed(2),
+        avgCostBasis: newAvgCostBasis?.toFixed(4),
+        totalCostBasis: newTotalCostBasis?.toFixed(2),
       });
     }
   }
@@ -484,13 +447,7 @@ export class OrderEngineService {
       const openBorrows = await tx
         .select()
         .from(borrows)
-        .where(
-          and(
-            eq(borrows.cuidUserId, cuidUserId),
-            eq(borrows.symbol, symbol),
-            isNull(borrows.closedAt),
-          ),
-        )
+        .where(and(eq(borrows.cuidUserId, cuidUserId), eq(borrows.symbol, symbol), isNull(borrows.closedAt)))
         .orderBy(asc(borrows.openedAt));
 
       for (const borrow of openBorrows) {
@@ -501,10 +458,7 @@ export class OrderEngineService {
 
         if (closingQty.gte(borrowQty)) {
           // Close entire borrow
-          await tx
-            .update(borrows)
-            .set({ closedAt: new Date() })
-            .where(eq(borrows.id, borrow.id));
+          await tx.update(borrows).set({ closedAt: new Date() }).where(eq(borrows.id, borrow.id));
         } else {
           // Partial close: reduce borrow quantity and create closed record
           await tx
@@ -516,9 +470,7 @@ export class OrderEngineService {
         }
 
         // Release margin
-        const marginRelease = new Decimal(borrow.entryPrice)
-          .mul(closingQty)
-          .mul(INITIAL_MARGIN_REQUIREMENT);
+        const marginRelease = new Decimal(borrow.entryPrice).mul(closingQty).mul(INITIAL_MARGIN_REQUIREMENT);
         marginUsed = marginUsed.minus(marginRelease);
 
         remainingToCover = remainingToCover.minus(closingQty);
@@ -549,9 +501,7 @@ export class OrderEngineService {
     // Fallback: use market data provider asset flags
     try {
       const asset = await this.marketDataService.getAssets();
-      const assetRecord = asset.find(
-        (a) => a.symbol.toUpperCase() === symbol.toUpperCase(),
-      );
+      const assetRecord = asset.find((a) => a.symbol.toUpperCase() === symbol.toUpperCase());
 
       if (!assetRecord || !assetRecord.shortable) {
         return { tier: 'not_shortable', rate: '0.0000' };

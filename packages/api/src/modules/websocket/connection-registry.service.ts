@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
 import { WS_MAX_CONNECTIONS_PER_CUID } from '@algoarena/shared';
-import type { WebSocket } from 'ws';
+import { Injectable } from '@nestjs/common';
+import { WebSocket } from 'ws';
 
 @Injectable()
 export class ConnectionRegistryService {

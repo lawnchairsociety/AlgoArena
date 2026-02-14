@@ -1,5 +1,5 @@
 import { Link, useMatches } from '@tanstack/react-router';
-import { Briefcase, ClipboardList, BarChart3 } from 'lucide-react';
+import { BarChart3, Briefcase, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -29,9 +29,7 @@ export function DashboardNav({ cuid, variant }: DashboardNavProps) {
               params={{ cuid }}
               className={cn(
                 'flex flex-col items-center gap-1 px-4 py-1 text-xs font-medium transition-colors',
-                isActive
-                  ? 'text-foreground'
-                  : 'text-muted-foreground',
+                isActive ? 'text-foreground' : 'text-muted-foreground',
               )}
             >
               <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />

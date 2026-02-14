@@ -1,11 +1,11 @@
+import { OrderSide, OrderType } from '@algoarena/shared';
 import { Injectable, Logger } from '@nestjs/common';
-import { eq, and, inArray } from 'drizzle-orm';
 import Decimal from 'decimal.js';
+import { and, eq, inArray } from 'drizzle-orm';
 import { DrizzleProvider } from '../database/drizzle.provider';
 import { orders } from '../database/schema';
 import { MarketDataService } from '../market-data/market-data.service';
 import { OrderEngineService } from '../trading/order-engine.service';
-import type { OrderSide, OrderType } from '@algoarena/shared';
 
 @Injectable()
 export class PriceMonitorService {
@@ -52,9 +52,7 @@ export class PriceMonitorService {
         evaluated++;
 
         if (fillPrice) {
-          const fillQuantity = new Decimal(order.quantity).minus(
-            new Decimal(order.filledQuantity),
-          );
+          const fillQuantity = new Decimal(order.quantity).minus(new Decimal(order.filledQuantity));
 
           await this.orderEngine.executeFill({
             orderId: order.id,
@@ -63,21 +61,15 @@ export class PriceMonitorService {
           });
 
           filled++;
-          this.logger.log(
-            `Filled ${order.type} order ${order.id} for ${order.symbol} @ ${fillPrice.toFixed(4)}`,
-          );
+          this.logger.log(`Filled ${order.type} order ${order.id} for ${order.symbol} @ ${fillPrice.toFixed(4)}`);
         }
       } catch (error) {
-        this.logger.error(
-          `Error evaluating order ${order.id}: ${error instanceof Error ? error.message : error}`,
-        );
+        this.logger.error(`Error evaluating order ${order.id}: ${error instanceof Error ? error.message : error}`);
       }
     }
 
     if (evaluated > 0) {
-      this.logger.log(
-        `Price monitor: evaluated ${evaluated} orders, filled ${filled}`,
-      );
+      this.logger.log(`Price monitor: evaluated ${evaluated} orders, filled ${filled}`);
     }
   }
 
@@ -85,12 +77,7 @@ export class PriceMonitorService {
     const marketOrders = await this.drizzle.db
       .select()
       .from(orders)
-      .where(
-        and(
-          inArray(orders.status, ['pending', 'partially_filled']),
-          eq(orders.type, 'market'),
-        ),
-      );
+      .where(and(inArray(orders.status, ['pending', 'partially_filled']), eq(orders.type, 'market')));
 
     if (marketOrders.length === 0) return;
 
@@ -107,13 +94,8 @@ export class PriceMonitorService {
           continue;
         }
 
-        const fillPrice = this.orderEngine.getMarketFillPrice(
-          order.side as OrderSide,
-          quote,
-        );
-        const fillQuantity = new Decimal(order.quantity).minus(
-          new Decimal(order.filledQuantity),
-        );
+        const fillPrice = this.orderEngine.getMarketFillPrice(order.side as OrderSide, quote);
+        const fillQuantity = new Decimal(order.quantity).minus(new Decimal(order.filledQuantity));
 
         await this.orderEngine.executeFill({
           orderId: order.id,
@@ -122,13 +104,9 @@ export class PriceMonitorService {
         });
 
         filled++;
-        this.logger.log(
-          `Filled queued market order ${order.id} for ${order.symbol} @ ${fillPrice.toFixed(4)}`,
-        );
+        this.logger.log(`Filled queued market order ${order.id} for ${order.symbol} @ ${fillPrice.toFixed(4)}`);
       } catch (error) {
-        this.logger.error(
-          `Error filling market order ${order.id}: ${error instanceof Error ? error.message : error}`,
-        );
+        this.logger.error(`Error filling market order ${order.id}: ${error instanceof Error ? error.message : error}`);
       }
     }
 

@@ -1,8 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { usePositions } from '@/api/hooks/use-positions';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, formatQuantity, pnlColor } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -42,14 +42,23 @@ export function PositionsTable() {
                   <TableRow key={pos.id}>
                     <TableCell className="font-medium">{pos.symbol}</TableCell>
                     <TableCell>
-                      <Badge variant={pos.side === 'long' ? 'default' : 'destructive'} className={pos.side === 'long' ? 'bg-profit text-background' : ''}>
+                      <Badge
+                        variant={pos.side === 'long' ? 'default' : 'destructive'}
+                        className={pos.side === 'long' ? 'bg-profit text-background' : ''}
+                      >
                         {pos.side}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono">{formatQuantity(pos.quantity)}</TableCell>
-                    <TableCell className="text-right font-mono hidden sm:table-cell">{formatCurrency(pos.avgCostBasis)}</TableCell>
-                    <TableCell className="text-right font-mono hidden sm:table-cell">{formatCurrency(pos.currentPrice)}</TableCell>
-                    <TableCell className="text-right font-mono hidden md:table-cell">{formatCurrency(pos.marketValue)}</TableCell>
+                    <TableCell className="text-right font-mono hidden sm:table-cell">
+                      {formatCurrency(pos.avgCostBasis)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono hidden sm:table-cell">
+                      {formatCurrency(pos.currentPrice)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono hidden md:table-cell">
+                      {formatCurrency(pos.marketValue)}
+                    </TableCell>
                     <TableCell className={cn('text-right font-mono', pnlColor(pos.unrealizedPnl))}>
                       {formatCurrency(pos.unrealizedPnl)}
                     </TableCell>

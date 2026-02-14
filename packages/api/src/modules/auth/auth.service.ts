@@ -1,23 +1,16 @@
-import * as crypto from 'crypto';
-import {
-  ForbiddenException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import * as crypto from 'node:crypto';
+import { DEFAULT_MARGIN_USED, DEFAULT_STARTING_BALANCE } from '@algoarena/shared';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { DEFAULT_STARTING_BALANCE, DEFAULT_MARGIN_USED } from '@algoarena/shared';
+import { eq } from 'drizzle-orm';
 import { DrizzleProvider } from '../database/drizzle.provider';
-import { apiKeys, cuidUsers, positions, borrows } from '../database/schema';
+import { apiKeys, borrows, cuidUsers, positions } from '../database/schema';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { CreateCuidUserDto } from './dto/create-cuid-user.dto';
 import { ResetAccountDto } from './dto/reset-account.dto';
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(private readonly drizzle: DrizzleProvider) {}
 
   async generateApiKey(dto: CreateApiKeyDto) {
@@ -25,29 +18,19 @@ export class AuthService {
     const keyPrefix = rawKey.substring(0, 8);
     const keyHash = await bcrypt.hash(rawKey, 12);
 
-    const [record] = await this.drizzle.db
-      .insert(apiKeys)
-      .values({ keyHash, keyPrefix, label: dto.label })
-      .returning();
+    const [record] = await this.drizzle.db.insert(apiKeys).values({ keyHash, keyPrefix, label: dto.label }).returning();
 
     return { ...record, rawKey };
   }
 
   async revokeApiKey(id: string) {
-    const [existing] = await this.drizzle.db
-      .select()
-      .from(apiKeys)
-      .where(eq(apiKeys.id, id))
-      .limit(1);
+    const [existing] = await this.drizzle.db.select().from(apiKeys).where(eq(apiKeys.id, id)).limit(1);
 
     if (!existing) {
       throw new NotFoundException('API key not found');
     }
 
-    await this.drizzle.db
-      .update(apiKeys)
-      .set({ isActive: false, revokedAt: new Date() })
-      .where(eq(apiKeys.id, id));
+    await this.drizzle.db.update(apiKeys).set({ isActive: false, revokedAt: new Date() }).where(eq(apiKeys.id, id));
   }
 
   async createCuidUser(apiKeyId: string, dto: CreateCuidUserDto) {
@@ -72,11 +55,7 @@ export class AuthService {
   async resetAccount(cuid: string, apiKeyId: string, dto: ResetAccountDto) {
     await this.verifyOwnership(apiKeyId, cuid);
 
-    const [user] = await this.drizzle.db
-      .select()
-      .from(cuidUsers)
-      .where(eq(cuidUsers.id, cuid))
-      .limit(1);
+    const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, cuid)).limit(1);
 
     if (!user) {
       throw new NotFoundException('CUID user not found');
@@ -89,10 +68,7 @@ export class AuthService {
       await tx.delete(positions).where(eq(positions.cuidUserId, cuid));
 
       // Close all open borrows
-      await tx
-        .update(borrows)
-        .set({ closedAt: new Date() })
-        .where(eq(borrows.cuidUserId, cuid));
+      await tx.update(borrows).set({ closedAt: new Date() }).where(eq(borrows.cuidUserId, cuid));
 
       // Reset cash balance and margin
       await tx
@@ -106,21 +82,13 @@ export class AuthService {
     });
 
     // Return updated user
-    const [updated] = await this.drizzle.db
-      .select()
-      .from(cuidUsers)
-      .where(eq(cuidUsers.id, cuid))
-      .limit(1);
+    const [updated] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, cuid)).limit(1);
 
     return updated;
   }
 
   async verifyOwnership(apiKeyId: string, cuid: string) {
-    const [user] = await this.drizzle.db
-      .select()
-      .from(cuidUsers)
-      .where(eq(cuidUsers.id, cuid))
-      .limit(1);
+    const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, cuid)).limit(1);
 
     if (!user) {
       throw new NotFoundException('CUID user not found');
@@ -134,18 +102,11 @@ export class AuthService {
   }
 
   async listUsers(apiKeyId: string) {
-    return this.drizzle.db
-      .select()
-      .from(cuidUsers)
-      .where(eq(cuidUsers.apiKeyId, apiKeyId));
+    return this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.apiKeyId, apiKeyId));
   }
 
   async getUser(cuid: string) {
-    const [user] = await this.drizzle.db
-      .select()
-      .from(cuidUsers)
-      .where(eq(cuidUsers.id, cuid))
-      .limit(1);
+    const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, cuid)).limit(1);
 
     if (!user) {
       throw new NotFoundException('CUID user not found');
@@ -156,7 +117,7 @@ export class AuthService {
 
   private generateCuid(): string {
     const letters = 'abcdefghijklmnopqrstuvwxyz';
-    const alphanumeric = letters + '0123456789';
+    const alphanumeric = `${letters}0123456789`;
     const bytes = crypto.randomBytes(24);
     let result = letters[bytes[0] % 26]; // first char is always a letter
     for (let i = 1; i < 24; i++) {

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
-import type { Quote, Bar } from '@/types/api';
+import type { Bar, Quote } from '@/types/api';
 
 interface Snapshot {
   latestTrade: { timestamp: string; price: number; size: number };

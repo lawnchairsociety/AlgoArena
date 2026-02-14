@@ -1,5 +1,5 @@
-import { Card, CardContent } from '@/components/ui/card';
 import { ExternalLink } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 export function InfoBox() {
   return (
@@ -10,8 +10,8 @@ export function InfoBox() {
       <CardContent className="pt-0 text-center">
         <h1 className="text-2xl font-bold tracking-tight">AlgoArena</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Paper trading platform for testing algorithmic &amp; AI trading strategies.
-          All trading via REST API &mdash; this dashboard is read-only.
+          Paper trading platform for testing algorithmic &amp; AI trading strategies. All trading via REST API &mdash;
+          this dashboard is read-only.
         </p>
         <div className="mt-4 flex items-center justify-center gap-4 text-sm">
           <a
@@ -30,10 +30,7 @@ export function InfoBox() {
           >
             Docs <ExternalLink className="h-3 w-3" />
           </a>
-          <a
-            href="/agent-guide"
-            className="inline-flex items-center gap-1 text-primary hover:underline"
-          >
+          <a href="/agent-guide" className="inline-flex items-center gap-1 text-primary hover:underline">
             Agent Guide
           </a>
         </div>

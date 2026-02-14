@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useDeferredValue } from 'react';
+import { useDeferredValue, useState } from 'react';
+import { useOrders } from '@/api/hooks/use-orders';
+import { OrderDetailPanel } from '@/components/orders/order-detail-panel';
 import { OrderFilters } from '@/components/orders/order-filters';
 import { OrdersTable } from '@/components/orders/orders-table';
-import { OrderDetailPanel } from '@/components/orders/order-detail-panel';
-import { useOrders } from '@/api/hooks/use-orders';
 
 export const Route = createFileRoute('/dashboard/$cuid/orders')({
   component: OrdersPage,
@@ -33,9 +33,7 @@ function OrdersPage() {
         selectedOrderId={selectedOrderId}
         onSelectOrder={setSelectedOrderId}
       />
-      {selectedOrderId && (
-        <OrderDetailPanel orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />
-      )}
+      {selectedOrderId && <OrderDetailPanel orderId={selectedOrderId} onClose={() => setSelectedOrderId(null)} />}
     </div>
   );
 }

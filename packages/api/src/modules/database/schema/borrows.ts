@@ -1,6 +1,6 @@
-import { pgTable, uuid, text, numeric, timestamp } from 'drizzle-orm/pg-core';
-import { borrowTierEnum } from './enums';
+import { numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { cuidUsers } from './cuid-users';
+import { borrowTierEnum } from './enums';
 
 export const borrows = pgTable('borrows', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -12,9 +12,7 @@ export const borrows = pgTable('borrows', {
   entryPrice: numeric('entry_price', { precision: 14, scale: 4 }).notNull(),
   borrowRate: numeric('borrow_rate', { precision: 8, scale: 4 }).notNull(),
   borrowTier: borrowTierEnum('borrow_tier').notNull(),
-  accruedFees: numeric('accrued_fees', { precision: 14, scale: 2 })
-    .notNull()
-    .default('0.00'),
+  accruedFees: numeric('accrued_fees', { precision: 14, scale: 2 }).notNull().default('0.00'),
   openedAt: timestamp('opened_at', { withTimezone: true }).notNull().defaultNow(),
   closedAt: timestamp('closed_at', { withTimezone: true }),
 });

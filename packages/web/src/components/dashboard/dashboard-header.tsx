@@ -1,9 +1,9 @@
-import { Badge } from '@/components/ui/badge';
-import { useUser } from '@/api/hooks/use-user';
+import { Clock, User } from 'lucide-react';
 import { useMarketClock } from '@/api/hooks/use-market-clock';
-import { useCuidStore } from '@/stores/cuid-store';
+import { useUser } from '@/api/hooks/use-user';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { User, Clock } from 'lucide-react';
+import { useCuidStore } from '@/stores/cuid-store';
 
 export function DashboardHeader() {
   const cuid = useCuidStore((s) => s.cuid);
@@ -28,7 +28,10 @@ export function DashboardHeader() {
       <div className="flex items-center gap-2 shrink-0">
         <Clock className="h-4 w-4 text-muted-foreground hidden sm:block" />
         {clock ? (
-          <Badge variant={clock.isOpen ? 'default' : 'destructive'} className={clock.isOpen ? 'bg-profit text-background' : ''}>
+          <Badge
+            variant={clock.isOpen ? 'default' : 'destructive'}
+            className={clock.isOpen ? 'bg-profit text-background' : ''}
+          >
             Market {clock.isOpen ? 'Open' : 'Closed'}
           </Badge>
         ) : (

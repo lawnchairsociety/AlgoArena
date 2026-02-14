@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect } from 'react';
-import { useCuidStore } from '@/stores/cuid-store';
-import { DashboardLayout } from '@/components/dashboard/dashboard-layout';
 import { useUser } from '@/api/hooks/use-user';
+import { DashboardLayout } from '@/components/dashboard/dashboard-layout';
+import { useCuidStore } from '@/stores/cuid-store';
 
 export const Route = createFileRoute('/dashboard/$cuid')({
   component: DashboardRoute,

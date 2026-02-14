@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, numeric, timestamp } from 'drizzle-orm/pg-core';
+import { numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { borrowTierEnum } from './enums';
 
 export const borrowFeeTiers = pgTable('borrow_fee_tiers', {

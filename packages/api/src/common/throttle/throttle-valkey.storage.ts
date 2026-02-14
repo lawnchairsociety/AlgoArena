@@ -6,13 +6,7 @@ import { ValkeyProvider } from '../../modules/cache/valkey.provider';
 export class ThrottleValkeyStorage implements ThrottlerStorage {
   constructor(private readonly valkey: ValkeyProvider) {}
 
-  async increment(
-    key: string,
-    ttl: number,
-    limit: number,
-    blockDuration: number,
-    throttlerName: string,
-  ) {
+  async increment(key: string, ttl: number, limit: number, blockDuration: number, throttlerName: string) {
     const storageKey = `throttle:${throttlerName}:${key}`;
     const ttlSeconds = Math.ceil(ttl / 1000);
 

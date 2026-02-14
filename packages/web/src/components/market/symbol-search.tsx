@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { useAssets } from '@/api/hooks/use-assets';
 import { Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAssets } from '@/api/hooks/use-assets';
+import { Input } from '@/components/ui/input';
 
 interface SymbolSearchProps {
   value: string;
@@ -17,9 +17,7 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
   const filtered = useMemo(() => {
     if (!assets || !query) return [];
     const q = query.toUpperCase();
-    return assets
-      .filter((a) => a.tradable && (a.symbol.includes(q) || a.name.toUpperCase().includes(q)))
-      .slice(0, 20);
+    return assets.filter((a) => a.tradable && (a.symbol.includes(q) || a.name.toUpperCase().includes(q))).slice(0, 20);
   }, [assets, query]);
 
   useEffect(() => {
@@ -58,6 +56,7 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
           <div className="max-h-64 overflow-y-auto p-1">
             {filtered.map((asset) => (
               <button
+                type="button"
                 key={asset.id}
                 onClick={() => {
                   setQuery(asset.symbol);

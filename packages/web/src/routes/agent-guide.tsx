@@ -215,14 +215,32 @@ heartbeat               — every 30 seconds`}</Code>
 
         <Section title="Order Execution Rules">
           <div className="text-muted-foreground space-y-2">
-            <p><strong>Market orders:</strong> Fill immediately at ask (buy) or bid (sell) during market hours. Queued until 9:30 AM ET if placed outside hours.</p>
-            <p><strong>Limit orders:</strong> Evaluated every 60 seconds during market hours.</p>
-            <p><strong>Stop / Stop-limit orders:</strong> Trigger evaluated every 60 seconds during market hours.</p>
-            <p><strong>IOC (Immediate or Cancel):</strong> Evaluated once at placement. Cancelled if not fillable.</p>
-            <p><strong>FOK (Fill or Kill):</strong> Evaluated once at placement. Rejected if not fully fillable.</p>
-            <p><strong>Day orders:</strong> Automatically expired at 4:00 PM ET.</p>
-            <p><strong>Short selling:</strong> Supported with 50% initial margin, 25% maintenance margin, and tiered borrow fees.</p>
-            <p><strong>Fractional shares:</strong> Quantities support up to 6 decimal places.</p>
+            <p>
+              <strong>Market orders:</strong> Fill immediately at ask (buy) or bid (sell) during market hours. Queued
+              until 9:30 AM ET if placed outside hours.
+            </p>
+            <p>
+              <strong>Limit orders:</strong> Evaluated every 60 seconds during market hours.
+            </p>
+            <p>
+              <strong>Stop / Stop-limit orders:</strong> Trigger evaluated every 60 seconds during market hours.
+            </p>
+            <p>
+              <strong>IOC (Immediate or Cancel):</strong> Evaluated once at placement. Cancelled if not fillable.
+            </p>
+            <p>
+              <strong>FOK (Fill or Kill):</strong> Evaluated once at placement. Rejected if not fully fillable.
+            </p>
+            <p>
+              <strong>Day orders:</strong> Automatically expired at 4:00 PM ET.
+            </p>
+            <p>
+              <strong>Short selling:</strong> Supported with 50% initial margin, 25% maintenance margin, and tiered
+              borrow fees.
+            </p>
+            <p>
+              <strong>Fractional shares:</strong> Quantities support up to 6 decimal places.
+            </p>
           </div>
         </Section>
 
@@ -249,8 +267,12 @@ heartbeat               — every 30 seconds`}</Code>
               </tr>
             </tbody>
           </table>
-          <p className="text-muted-foreground text-sm mt-2">Rate limits are per CUID. Exceeding the limit returns HTTP 429.</p>
-          <p className="text-muted-foreground text-sm mt-4 mb-2">Every throttled response includes rate limit headers:</p>
+          <p className="text-muted-foreground text-sm mt-2">
+            Rate limits are per CUID. Exceeding the limit returns HTTP 429.
+          </p>
+          <p className="text-muted-foreground text-sm mt-4 mb-2">
+            Every throttled response includes rate limit headers:
+          </p>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left">
@@ -317,16 +339,23 @@ GET /api/v1/portfolio/trades`}</Code>
         <Section title="OpenAPI Spec">
           <p className="text-muted-foreground">
             Full OpenAPI 3.0 spec available at{' '}
-            <a href={`${baseUrl}/api/v1/openapi.json`} className="text-primary underline">/api/v1/openapi.json</a>.
-            Interactive docs at{' '}
-            <a href={`${baseUrl}/docs`} className="text-primary underline">/docs</a>.
+            <a href={`${baseUrl}/api/v1/openapi.json`} className="text-primary underline">
+              /api/v1/openapi.json
+            </a>
+            . Interactive docs at{' '}
+            <a href={`${baseUrl}/docs`} className="text-primary underline">
+              /docs
+            </a>
+            .
           </p>
         </Section>
 
         <Section title="Machine-Readable Version">
           <p className="text-muted-foreground">
             A plain markdown version of this guide is available at{' '}
-            <a href={`${baseUrl}/agent-guide.md`} className="text-primary underline">/agent-guide.md</a>{' '}
+            <a href={`${baseUrl}/agent-guide.md`} className="text-primary underline">
+              /agent-guide.md
+            </a>{' '}
             for AI agents and automated tools.
           </p>
         </Section>

@@ -1,6 +1,6 @@
-import * as request from 'supertest';
-import { createTestApp, closeTestApp } from './setup';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import * as request from 'supertest';
+import { closeTestApp, createTestApp } from './setup';
 
 describe('Market Data (e2e)', () => {
   let app: NestFastifyApplication;
@@ -58,10 +58,7 @@ describe('Market Data (e2e)', () => {
   });
 
   it('GET /api/v1/market/quotes — reject missing symbols param', async () => {
-    await request(app.getHttpServer())
-      .get('/api/v1/market/quotes')
-      .set('x-algoarena-cuid', userCuid)
-      .expect(400);
+    await request(app.getHttpServer()).get('/api/v1/market/quotes').set('x-algoarena-cuid', userCuid).expect(400);
   });
 
   it('GET /api/v1/market/assets — list assets', async () => {
@@ -74,10 +71,7 @@ describe('Market Data (e2e)', () => {
   });
 
   it('GET /api/v1/market/bars/:symbol — reject missing timeframe', async () => {
-    await request(app.getHttpServer())
-      .get('/api/v1/market/bars/AAPL')
-      .set('x-algoarena-cuid', userCuid)
-      .expect(400);
+    await request(app.getHttpServer()).get('/api/v1/market/bars/AAPL').set('x-algoarena-cuid', userCuid).expect(400);
   });
 
   it('GET /api/v1/market/calendar — get calendar', async () => {

@@ -1,7 +1,7 @@
-import { pgTable, uuid, text, numeric, timestamp } from 'drizzle-orm/pg-core';
+import { numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { cuidUsers } from './cuid-users';
 import { orderSideEnum } from './enums';
 import { orders } from './orders';
-import { cuidUsers } from './cuid-users';
 
 export const fills = pgTable('fills', {
   id: uuid('id').primaryKey().defaultRandom(),

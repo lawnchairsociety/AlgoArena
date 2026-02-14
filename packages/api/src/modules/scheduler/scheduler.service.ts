@@ -1,28 +1,17 @@
+import { MAINTENANCE_MARGIN_REQUIREMENT, OrderSide } from '@algoarena/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron } from '@nestjs/schedule';
-import { eq, and, inArray, isNull } from 'drizzle-orm';
 import Decimal from 'decimal.js';
-import { MAINTENANCE_MARGIN_REQUIREMENT } from '@algoarena/shared';
-import type { OrderSide } from '@algoarena/shared';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { DrizzleProvider } from '../database/drizzle.provider';
-import {
-  orders,
-  cuidUsers,
-  positions,
-  borrows,
-  portfolioSnapshots,
-} from '../database/schema';
+import { borrows, cuidUsers, orders, portfolioSnapshots, positions } from '../database/schema';
 import { MarketDataService } from '../market-data/market-data.service';
-import { OrderEngineService } from '../trading/order-engine.service';
-import type { Quote } from '../market-data/types/market-data-provider.types';
-import type {
-  OrderEventPayload,
-  MarginWarningPayload,
-  MarginLiquidationPayload,
-} from '../websocket/ws-event.types';
-import { PriceMonitorService } from './price-monitor.service';
+import { Quote } from '../market-data/types/market-data-provider.types';
 import { PortfolioService } from '../portfolio/portfolio.service';
+import { OrderEngineService } from '../trading/order-engine.service';
+import { MarginLiquidationPayload, MarginWarningPayload, OrderEventPayload } from '../websocket/ws-event.types';
+import { PriceMonitorService } from './price-monitor.service';
 
 @Injectable()
 export class SchedulerService {
@@ -34,7 +23,7 @@ export class SchedulerService {
     private readonly marketDataService: MarketDataService,
     private readonly orderEngine: OrderEngineService,
     private readonly priceMonitor: PriceMonitorService,
-    private readonly portfolioService: PortfolioService,
+    readonly _portfolioService: PortfolioService,
     private readonly eventEmitter: EventEmitter2,
   ) {
     this.logger.log('SchedulerService initialized');
@@ -53,9 +42,7 @@ export class SchedulerService {
 
       await this.priceMonitor.evaluatePendingOrders();
     } catch (error) {
-      this.logger.error(
-        `Price monitor error: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.error(`Price monitor error: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.unlock('priceMonitor');
     }
@@ -74,9 +61,7 @@ export class SchedulerService {
       this.logger.log('Market open: filling queued market orders');
       await this.priceMonitor.fillQueuedMarketOrders();
     } catch (error) {
-      this.logger.error(
-        `Market open error: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.error(`Market open error: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.unlock('marketOpen');
     }
@@ -101,12 +86,7 @@ export class SchedulerService {
           expiredAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(
-          and(
-            inArray(orders.status, ['pending', 'partially_filled']),
-            eq(orders.timeInForce, 'day'),
-          ),
-        )
+        .where(and(inArray(orders.status, ['pending', 'partially_filled']), eq(orders.timeInForce, 'day')))
         .returning({
           id: orders.id,
           cuidUserId: orders.cuidUserId,
@@ -130,9 +110,7 @@ export class SchedulerService {
 
       this.logger.log(`Market close: expired ${result.length} day orders`);
     } catch (error) {
-      this.logger.error(
-        `Market close error: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.error(`Market close error: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.unlock('marketClose');
     }
@@ -160,28 +138,21 @@ export class SchedulerService {
 
       // Batch-fetch all unique symbols once
       const allSymbols = [...new Set(allPositions.map((p) => p.symbol))];
-      const quotes =
-        allSymbols.length > 0
-          ? await this.marketDataService.getQuotes(allSymbols)
-          : {};
+      const quotes = allSymbols.length > 0 ? await this.marketDataService.getQuotes(allSymbols) : {};
 
       const snapshots: Array<typeof portfolioSnapshots.$inferInsert> = [];
 
       for (const user of allUsers) {
         const cash = new Decimal(user.cashBalance);
         const startingBalance = new Decimal(user.startingBalance);
-        const userPositions = allPositions.filter(
-          (p) => p.cuidUserId === user.id,
-        );
+        const userPositions = allPositions.filter((p) => p.cuidUserId === user.id);
 
         let positionsValue = new Decimal(0);
         for (const pos of userPositions) {
           const qty = new Decimal(pos.quantity);
           const quote = quotes[pos.symbol];
           if (quote) {
-            const price = qty.gt(0)
-              ? new Decimal(quote.bidPrice)
-              : new Decimal(quote.askPrice);
+            const price = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
             positionsValue = positionsValue.plus(qty.mul(price));
           }
         }
@@ -209,9 +180,7 @@ export class SchedulerService {
 
       this.logger.log(`Portfolio snapshots: saved ${snapshots.length} snapshots for ${todayET}`);
     } catch (error) {
-      this.logger.error(
-        `Portfolio snapshot error: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.error(`Portfolio snapshot error: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.unlock('portfolioSnapshots');
     }
@@ -227,10 +196,7 @@ export class SchedulerService {
       this.lock('borrowFees');
       this.logger.log('Accruing borrow fees');
 
-      const openBorrows = await this.drizzle.db
-        .select()
-        .from(borrows)
-        .where(isNull(borrows.closedAt));
+      const openBorrows = await this.drizzle.db.select().from(borrows).where(isNull(borrows.closedAt));
 
       if (openBorrows.length === 0) return;
 
@@ -271,11 +237,7 @@ export class SchedulerService {
       for (const [userId, totalFee] of feesByUser) {
         try {
           await this.drizzle.db.transaction(async (tx) => {
-            const [user] = await tx
-              .select()
-              .from(cuidUsers)
-              .where(eq(cuidUsers.id, userId))
-              .for('update');
+            const [user] = await tx.select().from(cuidUsers).where(eq(cuidUsers.id, userId)).for('update');
 
             if (!user) return;
 
@@ -294,9 +256,7 @@ export class SchedulerService {
 
       this.logger.log(`Borrow fees: accrued for ${openBorrows.length} borrows across ${feesByUser.size} users`);
     } catch (error) {
-      this.logger.error(
-        `Borrow fee accrual error: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.error(`Borrow fee accrual error: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.unlock('borrowFees');
     }
@@ -315,9 +275,7 @@ export class SchedulerService {
       this.logger.log('Running margin check');
 
       // Load all positions — filter shorts in code since numeric comparison is complex
-      const shortPositions = await this.drizzle.db
-        .select()
-        .from(positions);
+      const shortPositions = await this.drizzle.db.select().from(positions);
 
       // Group by user and filter to only shorts
       const userShorts = new Map<string, Array<typeof positions.$inferSelect>>();
@@ -345,17 +303,13 @@ export class SchedulerService {
         try {
           await this.checkAndLiquidateIfNeeded(userId, shorts, quotes);
         } catch (error) {
-          this.logger.error(
-            `Margin check error for user ${userId}: ${error instanceof Error ? error.message : error}`,
-          );
+          this.logger.error(`Margin check error for user ${userId}: ${error instanceof Error ? error.message : error}`);
         }
       }
 
       this.logger.log(`Margin check: evaluated ${userShorts.size} users with short positions`);
     } catch (error) {
-      this.logger.error(
-        `Margin check error: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.error(`Margin check error: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.unlock('marginCheck');
     }
@@ -369,18 +323,11 @@ export class SchedulerService {
     quotes: Record<string, Quote>,
   ): Promise<void> {
     // Load user and ALL positions for equity calculation
-    const [user] = await this.drizzle.db
-      .select()
-      .from(cuidUsers)
-      .where(eq(cuidUsers.id, userId))
-      .limit(1);
+    const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, userId)).limit(1);
 
     if (!user) return;
 
-    const allUserPositions = await this.drizzle.db
-      .select()
-      .from(positions)
-      .where(eq(positions.cuidUserId, userId));
+    const allUserPositions = await this.drizzle.db.select().from(positions).where(eq(positions.cuidUserId, userId));
 
     // Compute total equity
     const cash = new Decimal(user.cashBalance);
@@ -389,9 +336,7 @@ export class SchedulerService {
       const qty = new Decimal(pos.quantity);
       const quote = quotes[pos.symbol];
       if (quote) {
-        const price = qty.gt(0)
-          ? new Decimal(quote.bidPrice)
-          : new Decimal(quote.askPrice);
+        const price = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
         positionsValue = positionsValue.plus(qty.mul(price));
       }
     }
@@ -403,9 +348,7 @@ export class SchedulerService {
       const qty = new Decimal(pos.quantity).abs();
       const quote = quotes[pos.symbol];
       if (quote) {
-        maintenanceReq = maintenanceReq.plus(
-          qty.mul(new Decimal(quote.askPrice)).mul(MAINTENANCE_MARGIN_REQUIREMENT),
-        );
+        maintenanceReq = maintenanceReq.plus(qty.mul(new Decimal(quote.askPrice)).mul(MAINTENANCE_MARGIN_REQUIREMENT));
       }
     }
 
@@ -450,10 +393,7 @@ export class SchedulerService {
           })
           .returning();
 
-        const fillPrice = this.orderEngine.getMarketFillPrice(
-          'buy' as OrderSide,
-          quote,
-        );
+        const fillPrice = this.orderEngine.getMarketFillPrice('buy' as OrderSide, quote);
 
         await this.orderEngine.executeFill({
           orderId: coverOrder.id,
@@ -474,18 +414,11 @@ export class SchedulerService {
         } satisfies MarginLiquidationPayload);
 
         // Re-check equity after liquidation
-        const [updatedUser] = await this.drizzle.db
-          .select()
-          .from(cuidUsers)
-          .where(eq(cuidUsers.id, userId))
-          .limit(1);
+        const [updatedUser] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, userId)).limit(1);
 
         if (!updatedUser) break;
 
-        const updatedPositions = await this.drizzle.db
-          .select()
-          .from(positions)
-          .where(eq(positions.cuidUserId, userId));
+        const updatedPositions = await this.drizzle.db.select().from(positions).where(eq(positions.cuidUserId, userId));
 
         let updatedPosValue = new Decimal(0);
         for (const p of updatedPositions) {

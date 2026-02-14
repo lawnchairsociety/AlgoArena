@@ -1,10 +1,11 @@
-import { Module, Logger } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MarketDataProvider } from './market-data.provider';
 import { AlpacaClientService } from './alpaca-client.service';
-import { MarketDataService } from './market-data.service';
 import { MarketDataController } from './market-data.controller';
+import { MarketDataProvider } from './market-data.provider';
+import { MarketDataService } from './market-data.service';
 
+// biome-ignore lint/suspicious/noExplicitAny: generic constructor type for provider registry
 const PROVIDERS: Record<string, new (...args: any[]) => MarketDataProvider> = {
   alpaca: AlpacaClientService,
 };
@@ -19,9 +20,7 @@ const PROVIDERS: Record<string, new (...args: any[]) => MarketDataProvider> = {
         const ProviderClass = PROVIDERS[name];
         if (!ProviderClass) {
           const available = Object.keys(PROVIDERS).join(', ');
-          throw new Error(
-            `Unknown MARKET_DATA_PROVIDER "${name}". Available: ${available}`,
-          );
+          throw new Error(`Unknown MARKET_DATA_PROVIDER "${name}". Available: ${available}`);
         }
         new Logger('MarketDataModule').log(`Using market data provider: ${name}`);
         return new ProviderClass(configService);

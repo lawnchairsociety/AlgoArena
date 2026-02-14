@@ -1,12 +1,5 @@
+import { ORDER_SIDES, ORDER_TYPES, OrderSide, OrderType, TIME_IN_FORCE_VALUES, TimeInForce } from '@algoarena/shared';
 import { IsIn, IsNotEmpty, IsNumberString, IsOptional, IsString } from 'class-validator';
-import {
-  ORDER_SIDES,
-  ORDER_TYPES,
-  TIME_IN_FORCE_VALUES,
-  type OrderSide,
-  type OrderType,
-  type TimeInForce,
-} from '@algoarena/shared';
 
 export class PlaceOrderDto {
   @IsString()

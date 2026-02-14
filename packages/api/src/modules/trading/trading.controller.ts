@@ -1,24 +1,13 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiSecurity, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { CuidUser } from '../../common/decorators/cuid-user.decorator';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { CuidGuard } from '../../common/guards/cuid.guard';
-import { CuidUser } from '../../common/decorators/cuid-user.decorator';
-import type { CuidUserRecord } from '../../common/interfaces/authenticated-request.interface';
-import { TradingService } from './trading.service';
-import { PlaceOrderDto } from './dto/place-order.dto';
+import { CuidUserRecord } from '../../common/interfaces/authenticated-request.interface';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
+import { PlaceOrderDto } from './dto/place-order.dto';
+import { TradingService } from './trading.service';
 
 @ApiTags('Trading')
 @Controller('trading')
@@ -34,10 +23,7 @@ export class TradingController {
   @ApiSecurity('cuid')
   @ApiResponse({ status: 201, description: 'Order placed' })
   @ApiResponse({ status: 400, description: 'Validation error' })
-  async placeOrder(
-    @CuidUser() user: CuidUserRecord,
-    @Body() dto: PlaceOrderDto,
-  ) {
+  async placeOrder(@CuidUser() user: CuidUserRecord, @Body() dto: PlaceOrderDto) {
     return this.tradingService.placeOrder(user.id, dto);
   }
 
@@ -49,10 +35,7 @@ export class TradingController {
   @ApiSecurity('cuid')
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Order cancelled' })
-  async cancelOrder(
-    @CuidUser() user: CuidUserRecord,
-    @Param('id') orderId: string,
-  ) {
+  async cancelOrder(@CuidUser() user: CuidUserRecord, @Param('id') orderId: string) {
     return this.tradingService.cancelOrder(orderId, user.id);
   }
 
@@ -61,10 +44,7 @@ export class TradingController {
   @ApiOperation({ summary: 'List orders' })
   @ApiSecurity('cuid')
   @ApiResponse({ status: 200, description: 'Orders returned' })
-  async listOrders(
-    @CuidUser() user: CuidUserRecord,
-    @Query() query: ListOrdersQueryDto,
-  ) {
+  async listOrders(@CuidUser() user: CuidUserRecord, @Query() query: ListOrdersQueryDto) {
     return this.tradingService.listOrders(user.id, query);
   }
 
@@ -74,10 +54,7 @@ export class TradingController {
   @ApiSecurity('cuid')
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Order returned' })
-  async getOrder(
-    @CuidUser() user: CuidUserRecord,
-    @Param('id') orderId: string,
-  ) {
+  async getOrder(@CuidUser() user: CuidUserRecord, @Param('id') orderId: string) {
     return this.tradingService.getOrder(orderId, user.id);
   }
 }

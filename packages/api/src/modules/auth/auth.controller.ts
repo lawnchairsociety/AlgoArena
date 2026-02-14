@@ -1,25 +1,12 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiSecurity, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import { MasterKeyGuard } from '../../common/guards/master-key.guard';
-import { ApiKeyGuard } from '../../common/guards/api-key.guard';
-import { CuidGuard } from '../../common/guards/cuid.guard';
 import { ApiKey } from '../../common/decorators/api-key.decorator';
 import { CuidUser } from '../../common/decorators/cuid-user.decorator';
-import {
-  ApiKeyRecord,
-  CuidUserRecord,
-} from '../../common/interfaces/authenticated-request.interface';
+import { ApiKeyGuard } from '../../common/guards/api-key.guard';
+import { CuidGuard } from '../../common/guards/cuid.guard';
+import { MasterKeyGuard } from '../../common/guards/master-key.guard';
+import { ApiKeyRecord, CuidUserRecord } from '../../common/interfaces/authenticated-request.interface';
 import { AuthService } from './auth.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { CreateCuidUserDto } from './dto/create-cuid-user.dto';
@@ -56,10 +43,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Create a new CUID user' })
   @ApiSecurity('api-key')
   @ApiResponse({ status: 201, description: 'User created' })
-  async createUser(
-    @ApiKey() apiKey: ApiKeyRecord,
-    @Body() dto: CreateCuidUserDto,
-  ) {
+  async createUser(@ApiKey() apiKey: ApiKeyRecord, @Body() dto: CreateCuidUserDto) {
     return this.authService.createCuidUser(apiKey.id, dto);
   }
 
@@ -69,11 +53,7 @@ export class AuthController {
   @ApiSecurity('api-key')
   @ApiParam({ name: 'cuid', description: 'User CUID' })
   @ApiResponse({ status: 200, description: 'Account reset' })
-  async resetAccount(
-    @ApiKey() apiKey: ApiKeyRecord,
-    @Param('cuid') cuid: string,
-    @Body() dto: ResetAccountDto,
-  ) {
+  async resetAccount(@ApiKey() apiKey: ApiKeyRecord, @Param('cuid') cuid: string, @Body() dto: ResetAccountDto) {
     return this.authService.resetAccount(cuid, apiKey.id, dto);
   }
 

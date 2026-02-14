@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
-import * as bcrypt from 'bcrypt';
+import { IncomingMessage } from 'node:http';
 import { HEADER_API_KEY, HEADER_CUID } from '@algoarena/shared';
+import { Injectable } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import { eq } from 'drizzle-orm';
 import { DrizzleProvider } from '../database/drizzle.provider';
 import { apiKeys, cuidUsers } from '../database/schema';
-import type { IncomingMessage } from 'http';
 
 export interface WsAuthResult {
   cuidUserId: string;
@@ -13,8 +13,6 @@ export interface WsAuthResult {
 
 @Injectable()
 export class WsAuthService {
-  private readonly logger = new Logger(WsAuthService.name);
-
   constructor(private readonly drizzle: DrizzleProvider) {}
 
   async authenticate(request: IncomingMessage): Promise<WsAuthResult | null> {
@@ -27,10 +25,7 @@ export class WsAuthService {
 
     // Validate API key: prefix lookup → bcrypt compare → check isActive
     const prefix = rawKey.substring(0, 8);
-    const candidates = await this.drizzle.db
-      .select()
-      .from(apiKeys)
-      .where(eq(apiKeys.keyPrefix, prefix));
+    const candidates = await this.drizzle.db.select().from(apiKeys).where(eq(apiKeys.keyPrefix, prefix));
 
     let matchedKeyId: string | null = null;
 
@@ -49,11 +44,7 @@ export class WsAuthService {
     }
 
     // Validate CUID: user exists → parent API key active → key owns CUID
-    const [user] = await this.drizzle.db
-      .select()
-      .from(cuidUsers)
-      .where(eq(cuidUsers.id, cuid))
-      .limit(1);
+    const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, cuid)).limit(1);
 
     if (!user) {
       return null;
@@ -65,11 +56,7 @@ export class WsAuthService {
     }
 
     // Verify parent API key is active
-    const [parentKey] = await this.drizzle.db
-      .select()
-      .from(apiKeys)
-      .where(eq(apiKeys.id, user.apiKeyId))
-      .limit(1);
+    const [parentKey] = await this.drizzle.db.select().from(apiKeys).where(eq(apiKeys.id, user.apiKeyId)).limit(1);
 
     if (!parentKey || !parentKey.isActive) {
       return null;

@@ -1,13 +1,13 @@
+import { PDT_MAX_DAY_TRADES, PDT_MIN_EQUITY } from '@algoarena/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { and, eq, gte, sql } from 'drizzle-orm';
 import Decimal from 'decimal.js';
-import { PDT_MAX_DAY_TRADES, PDT_MIN_EQUITY } from '@algoarena/shared';
+import { and, eq, gte, sql } from 'drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleProvider } from '../database/drizzle.provider';
-import { dayTrades, fills } from '../database/schema';
-import type { PdtRestrictedPayload } from '../websocket/ws-event.types';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '../database/schema';
+import { dayTrades, fills } from '../database/schema';
+import { PdtRestrictedPayload } from '../websocket/ws-event.types';
 
 type Tx = Parameters<Parameters<NodePgDatabase<typeof schema>['transaction']>[0]>[0];
 
@@ -31,12 +31,7 @@ export class PdtService {
     const result = await this.drizzle.db
       .select({ count: sql<number>`count(*)::int` })
       .from(dayTrades)
-      .where(
-        and(
-          eq(dayTrades.cuidUserId, cuidUserId),
-          gte(dayTrades.tradeDate, windowStartDate),
-        ),
-      );
+      .where(and(eq(dayTrades.cuidUserId, cuidUserId), gte(dayTrades.tradeDate, windowStartDate)));
 
     return result[0]?.count ?? 0;
   }
@@ -45,10 +40,7 @@ export class PdtService {
    * Check PDT rule: if dayTradeCount >= 3 AND equity < $25k → reject.
    * Returns null if OK, or an error message string if blocked.
    */
-  async checkPdtRule(
-    cuidUserId: string,
-    equity: Decimal,
-  ): Promise<string | null> {
+  async checkPdtRule(cuidUserId: string, equity: Decimal): Promise<string | null> {
     const count = await this.countDayTradesInWindow(cuidUserId);
 
     if (count >= PDT_MAX_DAY_TRADES && equity.lt(PDT_MIN_EQUITY)) {
@@ -90,7 +82,7 @@ export class PdtService {
           eq(fills.cuidUserId, cuidUserId),
           eq(fills.symbol, symbol.toUpperCase()),
           eq(fills.side, oppositeSide),
-          gte(fills.filledAt, new Date(tradeDate + 'T00:00:00-05:00')),
+          gte(fills.filledAt, new Date(`${tradeDate}T00:00:00-05:00`)),
         ),
       )
       .limit(1);
@@ -104,10 +96,7 @@ export class PdtService {
     const sellPrice = side === 'sell' ? fillPrice : oppositeFill.price;
 
     // Use the smaller quantity as the day trade quantity
-    const qty = Decimal.min(
-      new Decimal(fillQuantity),
-      new Decimal(oppositeFill.quantity),
-    );
+    const qty = Decimal.min(new Decimal(fillQuantity), new Decimal(oppositeFill.quantity));
 
     await tx.insert(dayTrades).values({
       cuidUserId,
@@ -120,9 +109,7 @@ export class PdtService {
       tradeDate,
     });
 
-    this.logger.log(
-      `Recorded day trade for ${cuidUserId} on ${symbol} (${tradeDate})`,
-    );
+    this.logger.log(`Recorded day trade for ${cuidUserId} on ${symbol} (${tradeDate})`);
 
     // Count day trades in window (within tx for consistency)
     const windowStart = new Date();
@@ -132,12 +119,7 @@ export class PdtService {
     const result = await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(dayTrades)
-      .where(
-        and(
-          eq(dayTrades.cuidUserId, cuidUserId),
-          gte(dayTrades.tradeDate, windowStartDate),
-        ),
-      );
+      .where(and(eq(dayTrades.cuidUserId, cuidUserId), gte(dayTrades.tradeDate, windowStartDate)));
 
     return result[0]?.count ?? 0;
   }

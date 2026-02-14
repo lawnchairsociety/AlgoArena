@@ -9,14 +9,7 @@ export type OrderType = (typeof ORDER_TYPES)[number];
 export const TIME_IN_FORCE_VALUES = ['day', 'gtc', 'ioc', 'fok'] as const;
 export type TimeInForce = (typeof TIME_IN_FORCE_VALUES)[number];
 
-export const ORDER_STATUSES = [
-  'pending',
-  'filled',
-  'partially_filled',
-  'cancelled',
-  'expired',
-  'rejected',
-] as const;
+export const ORDER_STATUSES = ['pending', 'filled', 'partially_filled', 'cancelled', 'expired', 'rejected'] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const BORROW_TIERS = ['easy', 'moderate', 'hard', 'not_shortable'] as const;

@@ -11,9 +11,5 @@ const statusStyles: Record<string, string> = {
 };
 
 export function OrderStatusBadge({ status }: { status: string }) {
-  return (
-    <Badge className={cn('text-xs', statusStyles[status] || 'bg-secondary')}>
-      {status.replace('_', ' ')}
-    </Badge>
-  );
+  return <Badge className={cn('text-xs', statusStyles[status] || 'bg-secondary')}>{status.replace('_', ' ')}</Badge>;
 }

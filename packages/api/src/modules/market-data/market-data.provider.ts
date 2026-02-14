@@ -1,12 +1,4 @@
-import type {
-  Quote,
-  Bar,
-  BarsResponse,
-  Snapshot,
-  MarketClock,
-  Asset,
-  CalendarDay,
-} from './types/market-data-provider.types';
+import { Asset, BarsResponse, CalendarDay, MarketClock, Quote, Snapshot } from './types/market-data-provider.types';
 
 /**
  * Abstract market data provider.
@@ -37,17 +29,11 @@ export abstract class MarketDataProvider {
   abstract getClock(): Promise<MarketClock>;
 
   /** List tradeable assets, optionally filtered. */
-  abstract getAssets(params?: {
-    status?: string;
-    asset_class?: string;
-  }): Promise<Asset[]>;
+  abstract getAssets(params?: { status?: string; asset_class?: string }): Promise<Asset[]>;
 
   /** Get a single asset by symbol. */
   abstract getAsset(symbol: string): Promise<Asset>;
 
   /** Get the market calendar. */
-  abstract getCalendar(params?: {
-    start?: string;
-    end?: string;
-  }): Promise<CalendarDay[]>;
+  abstract getCalendar(params?: { start?: string; end?: string }): Promise<CalendarDay[]>;
 }

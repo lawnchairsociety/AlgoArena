@@ -1,10 +1,11 @@
+import { HEADER_CUID } from '@algoarena/shared';
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ThrottlerRequest } from '@nestjs/throttler/dist/throttler.guard.interface';
-import { HEADER_CUID } from '@algoarena/shared';
 
 @Injectable()
 export class CuidThrottlerGuard extends ThrottlerGuard {
+  // biome-ignore lint/suspicious/noExplicitAny: matches ThrottlerGuard base signature
   protected async getTracker(req: Record<string, any>): Promise<string> {
     return req.headers?.[HEADER_CUID] || req.ip;
   }
@@ -17,30 +18,19 @@ export class CuidThrottlerGuard extends ThrottlerGuard {
     return false;
   }
 
-  protected async handleRequest(
-    requestProps: ThrottlerRequest,
-  ): Promise<boolean> {
-    const {
-      context,
-      limit,
-      ttl,
-      throttler,
-      blockDuration,
-      getTracker,
-      generateKey,
-    } = requestProps;
+  protected async handleRequest(requestProps: ThrottlerRequest): Promise<boolean> {
+    const { context, limit, ttl, throttler, blockDuration, getTracker, generateKey } = requestProps;
     const { req, res } = this.getRequestResponse(context);
     const tracker = await getTracker(req, context);
     const name = throttler.name ?? 'default';
     const key = generateKey(context, tracker, name);
-    const { totalHits, timeToExpire, isBlocked, timeToBlockExpire } =
-      await this.storageService.increment(
-        key,
-        ttl,
-        limit,
-        blockDuration,
-        name,
-      );
+    const { totalHits, timeToExpire, isBlocked, timeToBlockExpire } = await this.storageService.increment(
+      key,
+      ttl,
+      limit,
+      blockDuration,
+      name,
+    );
 
     if (isBlocked) {
       res.header('Retry-After', timeToBlockExpire);

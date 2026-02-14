@@ -2,19 +2,19 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerStorage } from '@nestjs/throttler';
+import { CuidThrottlerGuard } from './common/throttle/cuid-throttler.guard';
+import { ThrottleValkeyStorage } from './common/throttle/throttle-valkey.storage';
 import { AppConfigModule } from './config/config.module';
-import { DatabaseModule } from './modules/database/database.module';
-import { CacheModule } from './modules/cache/cache.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CacheModule } from './modules/cache/cache.module';
+import { DatabaseModule } from './modules/database/database.module';
+import { HealthController } from './modules/health/health.controller';
 import { MarketDataModule } from './modules/market-data/market-data.module';
-import { TradingModule } from './modules/trading/trading.module';
 import { PortfolioModule } from './modules/portfolio/portfolio.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
-import { WebSocketModule } from './modules/websocket/websocket.module';
 import { StatsModule } from './modules/stats/stats.module';
-import { ThrottleValkeyStorage } from './common/throttle/throttle-valkey.storage';
-import { CuidThrottlerGuard } from './common/throttle/cuid-throttler.guard';
-import { HealthController } from './modules/health/health.controller';
+import { TradingModule } from './modules/trading/trading.module';
+import { WebSocketModule } from './modules/websocket/websocket.module';
 
 @Module({
   controllers: [HealthController],

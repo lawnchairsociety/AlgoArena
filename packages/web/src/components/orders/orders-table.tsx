@@ -1,10 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { OrderStatusBadge } from './order-status-badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { formatCurrency, formatDateTime, formatQuantity } from '@/lib/format';
 import type { Order } from '@/types/api';
-import { formatCurrency, formatQuantity, formatDateTime } from '@/lib/format';
+import { OrderStatusBadge } from './order-status-badge';
 
 interface OrdersTableProps {
   orders: Order[] | undefined;
@@ -54,14 +54,19 @@ export function OrdersTable({ orders, isLoading, selectedOrderId, onSelectOrder 
                     <TableCell className="text-xs hidden md:table-cell">{formatDateTime(order.createdAt)}</TableCell>
                     <TableCell className="font-medium">{order.symbol}</TableCell>
                     <TableCell>
-                      <Badge variant={order.side === 'buy' ? 'default' : 'destructive'} className={order.side === 'buy' ? 'bg-profit text-background' : ''}>
+                      <Badge
+                        variant={order.side === 'buy' ? 'default' : 'destructive'}
+                        className={order.side === 'buy' ? 'bg-profit text-background' : ''}
+                      >
                         {order.side}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-xs hidden sm:table-cell">{order.type.replace('_', ' ')}</TableCell>
                     <TableCell className="text-xs uppercase hidden lg:table-cell">{order.timeInForce}</TableCell>
                     <TableCell className="text-right font-mono">{formatQuantity(order.quantity)}</TableCell>
-                    <TableCell className="text-right font-mono hidden sm:table-cell">{formatQuantity(order.filledQuantity)}</TableCell>
+                    <TableCell className="text-right font-mono hidden sm:table-cell">
+                      {formatQuantity(order.filledQuantity)}
+                    </TableCell>
                     <TableCell className="text-right font-mono hidden md:table-cell">
                       {order.avgFillPrice ? formatCurrency(order.avgFillPrice) : '-'}
                     </TableCell>

@@ -1,6 +1,6 @@
+import { useQuote } from '@/api/hooks/use-quote';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useQuote } from '@/api/hooks/use-quote';
 import { formatCurrency } from '@/lib/format';
 
 export function QuoteCard({ symbol }: { symbol: string }) {

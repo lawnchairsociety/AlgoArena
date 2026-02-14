@@ -1,8 +1,8 @@
+import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useAccount } from '@/api/hooks/use-account';
+import { usePortfolioHistory } from '@/api/hooks/use-portfolio-history';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePortfolioHistory } from '@/api/hooks/use-portfolio-history';
-import { useAccount } from '@/api/hooks/use-account';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { formatCurrency } from '@/lib/format';
 
 export function PnlChart() {
@@ -64,11 +64,7 @@ export function PnlChart() {
                 formatter={(value: number) => [formatCurrency(String(value)), 'Equity']}
                 cursor={{ fill: 'transparent' }}
               />
-              <ReferenceLine
-                y={startingBalance}
-                stroke="hsl(215, 15%, 35%)"
-                strokeDasharray="4 4"
-              />
+              <ReferenceLine y={startingBalance} stroke="hsl(215, 15%, 35%)" strokeDasharray="4 4" />
               <Area
                 type="monotone"
                 dataKey="equity"

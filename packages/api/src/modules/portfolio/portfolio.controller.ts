@@ -1,14 +1,11 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiSecurity, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
-import { CuidGuard } from '../../common/guards/cuid.guard';
 import { CuidUser } from '../../common/decorators/cuid-user.decorator';
-import type { CuidUserRecord } from '../../common/interfaces/authenticated-request.interface';
+import { CuidGuard } from '../../common/guards/cuid.guard';
+import { CuidUserRecord } from '../../common/interfaces/authenticated-request.interface';
+import { PortfolioHistoryQueryDto, TradeHistoryQueryDto } from './dto/portfolio-query.dto';
 import { PortfolioService } from './portfolio.service';
-import {
-  PortfolioHistoryQueryDto,
-  TradeHistoryQueryDto,
-} from './dto/portfolio-query.dto';
 
 @ApiTags('Portfolio')
 @Controller('portfolio')
@@ -37,20 +34,14 @@ export class PortfolioController {
   @ApiOperation({ summary: 'Get position for a specific symbol' })
   @ApiParam({ name: 'symbol', description: 'Stock symbol' })
   @ApiResponse({ status: 200, description: 'Position returned' })
-  async getPositionBySymbol(
-    @CuidUser() user: CuidUserRecord,
-    @Param('symbol') symbol: string,
-  ) {
+  async getPositionBySymbol(@CuidUser() user: CuidUserRecord, @Param('symbol') symbol: string) {
     return this.portfolioService.getPositionBySymbol(user.id, symbol);
   }
 
   @Get('history')
   @ApiOperation({ summary: 'Get portfolio value history' })
   @ApiResponse({ status: 200, description: 'History returned' })
-  async getPortfolioHistory(
-    @CuidUser() user: CuidUserRecord,
-    @Query() query: PortfolioHistoryQueryDto,
-  ) {
+  async getPortfolioHistory(@CuidUser() user: CuidUserRecord, @Query() query: PortfolioHistoryQueryDto) {
     const days = query.days ?? 30;
     return this.portfolioService.getPortfolioHistory(user.id, days);
   }
@@ -58,10 +49,7 @@ export class PortfolioController {
   @Get('trades')
   @ApiOperation({ summary: 'Get trade history' })
   @ApiResponse({ status: 200, description: 'Trade history returned' })
-  async getTradeHistory(
-    @CuidUser() user: CuidUserRecord,
-    @Query() query: TradeHistoryQueryDto,
-  ) {
+  async getTradeHistory(@CuidUser() user: CuidUserRecord, @Query() query: TradeHistoryQueryDto) {
     return this.portfolioService.getTradeHistory(user.id, query);
   }
 }

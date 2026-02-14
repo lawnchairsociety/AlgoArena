@@ -1,7 +1,7 @@
-import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Pool } from 'pg';
 import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema';
 
 @Injectable()
@@ -15,9 +15,9 @@ export class DrizzleProvider implements OnModuleInit, OnModuleDestroy {
     const useSSL = rawUrl.includes('sslmode=require') || rawUrl.includes('digitalocean');
 
     // Strip sslmode from URL so pg doesn't override our ssl config
-    const databaseUrl = rawUrl.replace(/[?&]sslmode=[^&]+/, (match) =>
-      match.startsWith('?') ? '?' : '',
-    ).replace(/\?$/, '');
+    const databaseUrl = rawUrl
+      .replace(/[?&]sslmode=[^&]+/, (match) => (match.startsWith('?') ? '?' : ''))
+      .replace(/\?$/, '');
 
     this.pool = new Pool({
       connectionString: databaseUrl,

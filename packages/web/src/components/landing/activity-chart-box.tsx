@@ -1,7 +1,7 @@
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useActivity } from '@/api/hooks/use-activity';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useActivity } from '@/api/hooks/use-activity';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export function ActivityChartBox() {
   const { data, isLoading } = useActivity(30);
@@ -15,9 +15,7 @@ export function ActivityChartBox() {
         {isLoading ? (
           <Skeleton className="h-[180px] w-full" />
         ) : !data || data.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No trading activity yet
-          </p>
+          <p className="py-8 text-center text-sm text-muted-foreground">No trading activity yet</p>
         ) : (
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={data}>

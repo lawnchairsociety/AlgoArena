@@ -1,4 +1,4 @@
-import { pgTable, text, numeric, timestamp } from 'drizzle-orm/pg-core';
+import { numeric, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 import { cuidUsers } from './cuid-users';
 
 export const positions = pgTable('positions', {

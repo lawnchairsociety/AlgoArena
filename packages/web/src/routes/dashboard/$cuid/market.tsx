@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
-import { SymbolSearch } from '@/components/market/symbol-search';
-import { QuoteCard } from '@/components/market/quote-card';
 import { PriceChart } from '@/components/market/price-chart';
+import { QuoteCard } from '@/components/market/quote-card';
+import { SymbolSearch } from '@/components/market/symbol-search';
 
 export const Route = createFileRoute('/dashboard/$cuid/market')({
   component: MarketPage,

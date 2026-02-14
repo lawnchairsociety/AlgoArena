@@ -1,22 +1,15 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { eq, and, desc, gte } from 'drizzle-orm';
-import Decimal from 'decimal.js';
 import { PDT_MIN_EQUITY } from '@algoarena/shared';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import Decimal from 'decimal.js';
+import { and, desc, eq, gte } from 'drizzle-orm';
 import { DrizzleProvider } from '../database/drizzle.provider';
-import {
-  cuidUsers,
-  positions,
-  fills,
-  portfolioSnapshots,
-} from '../database/schema';
+import { cuidUsers, fills, portfolioSnapshots, positions } from '../database/schema';
 import { MarketDataService } from '../market-data/market-data.service';
 import { PdtService } from '../trading/pdt.service';
-import type { TradeHistoryQueryDto } from './dto/portfolio-query.dto';
+import { TradeHistoryQueryDto } from './dto/portfolio-query.dto';
 
 @Injectable()
 export class PortfolioService {
-  private readonly logger = new Logger(PortfolioService.name);
-
   constructor(
     private readonly drizzle: DrizzleProvider,
     private readonly marketDataService: MarketDataService,
@@ -24,20 +17,13 @@ export class PortfolioService {
   ) {}
 
   async getAccountSummary(userId: string) {
-    const [user] = await this.drizzle.db
-      .select()
-      .from(cuidUsers)
-      .where(eq(cuidUsers.id, userId))
-      .limit(1);
+    const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, userId)).limit(1);
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const userPositions = await this.drizzle.db
-      .select()
-      .from(positions)
-      .where(eq(positions.cuidUserId, userId));
+    const userPositions = await this.drizzle.db.select().from(positions).where(eq(positions.cuidUserId, userId));
 
     const cash = new Decimal(user.cashBalance);
     const startingBalance = new Decimal(user.startingBalance);
@@ -56,13 +42,9 @@ export class PortfolioService {
 
         if (quote) {
           // Longs use bid, shorts use ask
-          const price = qty.gt(0)
-            ? new Decimal(quote.bidPrice)
-            : new Decimal(quote.askPrice);
+          const price = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
           positionsValue = positionsValue.plus(qty.mul(price));
-          unrealizedPnl = unrealizedPnl.plus(
-            price.minus(avgCost).mul(qty),
-          );
+          unrealizedPnl = unrealizedPnl.plus(price.minus(avgCost).mul(qty));
         }
       }
     }
@@ -71,10 +53,7 @@ export class PortfolioService {
     const totalPnl = totalEquity.minus(startingBalance);
 
     const dayTradeCount = await this.pdtService.countDayTradesInWindow(userId);
-    const pdtRestricted =
-      user.pdtEnforced &&
-      dayTradeCount >= 3 &&
-      totalEquity.lt(PDT_MIN_EQUITY);
+    const pdtRestricted = user.pdtEnforced && dayTradeCount >= 3 && totalEquity.lt(PDT_MIN_EQUITY);
 
     return {
       userId: user.id,
@@ -92,10 +71,7 @@ export class PortfolioService {
   }
 
   async getPositions(userId: string) {
-    const userPositions = await this.drizzle.db
-      .select()
-      .from(positions)
-      .where(eq(positions.cuidUserId, userId));
+    const userPositions = await this.drizzle.db.select().from(positions).where(eq(positions.cuidUserId, userId));
 
     if (userPositions.length === 0) {
       return [];
@@ -115,9 +91,7 @@ export class PortfolioService {
       let unrealizedPnl = new Decimal(0);
 
       if (quote) {
-        currentPrice = qty.gt(0)
-          ? new Decimal(quote.bidPrice)
-          : new Decimal(quote.askPrice);
+        currentPrice = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
         marketValue = qty.mul(currentPrice);
         unrealizedPnl = currentPrice.minus(avgCost).mul(qty);
       }
@@ -134,11 +108,7 @@ export class PortfolioService {
 
   async getPositionBySymbol(userId: string, symbol: string) {
     const positionId = `${userId}:${symbol.toUpperCase()}`;
-    const [pos] = await this.drizzle.db
-      .select()
-      .from(positions)
-      .where(eq(positions.id, positionId))
-      .limit(1);
+    const [pos] = await this.drizzle.db.select().from(positions).where(eq(positions.id, positionId)).limit(1);
 
     if (!pos) {
       throw new NotFoundException(`No position found for ${symbol.toUpperCase()}`);
@@ -149,9 +119,7 @@ export class PortfolioService {
     const avgCost = new Decimal(pos.avgCostBasis);
     const side = qty.gt(0) ? 'long' : 'short';
 
-    const currentPrice = qty.gt(0)
-      ? new Decimal(quote.bidPrice)
-      : new Decimal(quote.askPrice);
+    const currentPrice = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
     const marketValue = qty.mul(currentPrice);
     const unrealizedPnl = currentPrice.minus(avgCost).mul(qty);
 
@@ -172,12 +140,7 @@ export class PortfolioService {
     return this.drizzle.db
       .select()
       .from(portfolioSnapshots)
-      .where(
-        and(
-          eq(portfolioSnapshots.cuidUserId, userId),
-          gte(portfolioSnapshots.snapshotDate, startDateStr),
-        ),
-      )
+      .where(and(eq(portfolioSnapshots.cuidUserId, userId), gte(portfolioSnapshots.snapshotDate, startDateStr)))
       .orderBy(portfolioSnapshots.snapshotDate);
   }
 

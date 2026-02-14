@@ -1,13 +1,7 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { eq } from 'drizzle-orm';
-import * as bcrypt from 'bcrypt';
 import { HEADER_API_KEY } from '@algoarena/shared';
+import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import { eq } from 'drizzle-orm';
 import { DrizzleProvider } from '../../modules/database/drizzle.provider';
 import { apiKeys } from '../../modules/database/schema';
 import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
@@ -28,10 +22,7 @@ export class ApiKeyGuard implements CanActivate {
 
     const prefix = rawKey.substring(0, 8);
 
-    const candidates = await this.drizzle.db
-      .select()
-      .from(apiKeys)
-      .where(eq(apiKeys.keyPrefix, prefix));
+    const candidates = await this.drizzle.db.select().from(apiKeys).where(eq(apiKeys.keyPrefix, prefix));
 
     for (const candidate of candidates) {
       if (!candidate.isActive) continue;
@@ -46,9 +37,7 @@ export class ApiKeyGuard implements CanActivate {
           .set({ lastUsedAt: new Date() })
           .where(eq(apiKeys.id, candidate.id))
           .then(() => {})
-          .catch((err) =>
-            this.logger.warn(`Failed to update lastUsedAt: ${err.message}`),
-          );
+          .catch((err) => this.logger.warn(`Failed to update lastUsedAt: ${err.message}`));
 
         return true;
       }
