@@ -29,48 +29,50 @@ export function OrdersTable({ orders, isLoading, selectedOrderId, onSelectOrder 
         ) : !orders || orders.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No orders found</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Symbol</TableHead>
-                <TableHead>Side</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>TIF</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Filled</TableHead>
-                <TableHead className="text-right">Avg Fill</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((order) => (
-                <TableRow
-                  key={order.id}
-                  className={`cursor-pointer ${selectedOrderId === order.id ? 'bg-muted/80' : ''}`}
-                  onClick={() => onSelectOrder(selectedOrderId === order.id ? null : order.id)}
-                >
-                  <TableCell className="text-xs">{formatDateTime(order.createdAt)}</TableCell>
-                  <TableCell className="font-medium">{order.symbol}</TableCell>
-                  <TableCell>
-                    <Badge variant={order.side === 'buy' ? 'default' : 'destructive'} className={order.side === 'buy' ? 'bg-profit text-background' : ''}>
-                      {order.side}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs">{order.type.replace('_', ' ')}</TableCell>
-                  <TableCell className="text-xs uppercase">{order.timeInForce}</TableCell>
-                  <TableCell className="text-right font-mono">{formatQuantity(order.quantity)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatQuantity(order.filledQuantity)}</TableCell>
-                  <TableCell className="text-right font-mono">
-                    {order.avgFillPrice ? formatCurrency(order.avgFillPrice) : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <OrderStatusBadge status={order.status} />
-                  </TableCell>
+          <div className="overflow-x-auto -mx-6 px-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="hidden md:table-cell">Time</TableHead>
+                  <TableHead>Symbol</TableHead>
+                  <TableHead>Side</TableHead>
+                  <TableHead className="hidden sm:table-cell">Type</TableHead>
+                  <TableHead className="hidden lg:table-cell">TIF</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Filled</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">Avg Fill</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow
+                    key={order.id}
+                    className={`cursor-pointer ${selectedOrderId === order.id ? 'bg-muted/80' : ''}`}
+                    onClick={() => onSelectOrder(selectedOrderId === order.id ? null : order.id)}
+                  >
+                    <TableCell className="text-xs hidden md:table-cell">{formatDateTime(order.createdAt)}</TableCell>
+                    <TableCell className="font-medium">{order.symbol}</TableCell>
+                    <TableCell>
+                      <Badge variant={order.side === 'buy' ? 'default' : 'destructive'} className={order.side === 'buy' ? 'bg-profit text-background' : ''}>
+                        {order.side}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs hidden sm:table-cell">{order.type.replace('_', ' ')}</TableCell>
+                    <TableCell className="text-xs uppercase hidden lg:table-cell">{order.timeInForce}</TableCell>
+                    <TableCell className="text-right font-mono">{formatQuantity(order.quantity)}</TableCell>
+                    <TableCell className="text-right font-mono hidden sm:table-cell">{formatQuantity(order.filledQuantity)}</TableCell>
+                    <TableCell className="text-right font-mono hidden md:table-cell">
+                      {order.avgFillPrice ? formatCurrency(order.avgFillPrice) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <OrderStatusBadge status={order.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>

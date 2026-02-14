@@ -3,7 +3,6 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { WsAdapter } from '@nestjs/platform-ws';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import ScalarApiReference from '@scalar/fastify-api-reference';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { API_PREFIX } from '@algoarena/shared';
@@ -60,12 +59,20 @@ async function bootstrap() {
   });
 
   // Serve Scalar API docs at /docs
-  await app.getHttpAdapter().getInstance().register(ScalarApiReference, {
-    routePrefix: '/docs',
-    configuration: {
-      title: 'AlgoArena API Docs',
-      url: `/${API_PREFIX}/openapi.json`,
-    },
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.get('/docs', (req: any, reply: any) => {
+    reply.type('text/html').send(`<!doctype html>
+<html>
+<head>
+  <title>AlgoArena API Docs</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <script id="api-reference" data-url="/${API_PREFIX}/openapi.json"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>`);
   });
 
   const port = parseInt(process.env.PORT || '3000', 10);

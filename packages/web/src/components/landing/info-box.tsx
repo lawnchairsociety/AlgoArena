@@ -4,8 +4,8 @@ import { ExternalLink } from 'lucide-react';
 export function InfoBox() {
   return (
     <Card className="relative overflow-visible">
-      <div className="-mt-8 mb-2 flex justify-center">
-        <img src="/algoarena.png" alt="AlgoArena" className="h-16 w-16 rounded-xl shadow-lg" />
+      <div className="-mt-12 mb-2 flex justify-center">
+        <img src="/algoarena.png" alt="AlgoArena" className="h-24 w-24 rounded-xl shadow-lg" />
       </div>
       <CardContent className="pt-0 text-center">
         <h1 className="text-2xl font-bold tracking-tight">AlgoArena</h1>
@@ -15,7 +15,7 @@ export function InfoBox() {
         </p>
         <div className="mt-4 flex items-center justify-center gap-4 text-sm">
           <a
-            href="https://github.com"
+            href="https://github.com/lawnchairsociety/AlgoArena"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-primary hover:underline"

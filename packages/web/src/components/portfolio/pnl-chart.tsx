@@ -62,6 +62,7 @@ export function PnlChart() {
                 labelStyle={{ color: 'hsl(210, 20%, 92%)' }}
                 labelFormatter={(label: string) => new Date(label).toLocaleDateString()}
                 formatter={(value: number) => [formatCurrency(String(value)), 'Equity']}
+                cursor={{ fill: 'transparent' }}
               />
               <ReferenceLine
                 y={startingBalance}

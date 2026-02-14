@@ -68,6 +68,15 @@ function AgentGuidePage() {
           </table>
         </Section>
 
+        <Section title="Health Check">
+          <p className="text-muted-foreground mb-2">Before starting a trading session, verify the API is available:</p>
+          <Code>{`GET /api/v1/health
+# No authentication required
+
+# Response:
+{ "status": "ok", "timestamp": "2025-01-15T10:30:00.000Z" }`}</Code>
+        </Section>
+
         <Section title="Setup Flow">
           <p className="text-muted-foreground mb-2">Run these steps once to get credentials:</p>
           <Code>{`# 1. Create an API key (requires master key)
@@ -241,6 +250,30 @@ heartbeat               — every 30 seconds`}</Code>
             </tbody>
           </table>
           <p className="text-muted-foreground text-sm mt-2">Rate limits are per CUID. Exceeding the limit returns HTTP 429.</p>
+          <p className="text-muted-foreground text-sm mt-4 mb-2">Every throttled response includes rate limit headers:</p>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left">
+                <th className="py-2 pr-4">Header</th>
+                <th className="py-2">Description</th>
+              </tr>
+            </thead>
+            <tbody className="text-muted-foreground">
+              <tr className="border-b border-border">
+                <td className="py-2 pr-4 font-mono text-xs">X-RateLimit-Limit</td>
+                <td className="py-2">Max requests allowed in the current window</td>
+              </tr>
+              <tr className="border-b border-border">
+                <td className="py-2 pr-4 font-mono text-xs">X-RateLimit-Remaining</td>
+                <td className="py-2">Requests remaining in the current window</td>
+              </tr>
+              <tr className="border-b border-border">
+                <td className="py-2 pr-4 font-mono text-xs">X-RateLimit-Reset</td>
+                <td className="py-2">Seconds until the window resets</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="text-muted-foreground text-sm mt-2">Use these headers to self-throttle and avoid 429 errors.</p>
         </Section>
 
         <Section title="Error Format">
@@ -254,7 +287,10 @@ heartbeat               — every 30 seconds`}</Code>
         </Section>
 
         <Section title="Example: Full Trading Loop">
-          <Code>{`# 1. Check if market is open
+          <Code>{`# 0. Verify API is up
+GET /api/v1/health
+
+# 1. Check if market is open
 GET /api/v1/market/clock
 
 # 2. Get current price
@@ -284,6 +320,14 @@ GET /api/v1/portfolio/trades`}</Code>
             <a href={`${baseUrl}/api/v1/openapi.json`} className="text-primary underline">/api/v1/openapi.json</a>.
             Interactive docs at{' '}
             <a href={`${baseUrl}/docs`} className="text-primary underline">/docs</a>.
+          </p>
+        </Section>
+
+        <Section title="Machine-Readable Version">
+          <p className="text-muted-foreground">
+            A plain markdown version of this guide is available at{' '}
+            <a href={`${baseUrl}/agent-guide.md`} className="text-primary underline">/agent-guide.md</a>{' '}
+            for AI agents and automated tools.
           </p>
         </Section>
 

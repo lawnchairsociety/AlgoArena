@@ -24,38 +24,40 @@ export function PositionsTable() {
         ) : !positions || positions.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No open positions</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Symbol</TableHead>
-                <TableHead>Side</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Avg Cost</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Market Value</TableHead>
-                <TableHead className="text-right">Unrealized P&L</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {positions.map((pos) => (
-                <TableRow key={pos.id}>
-                  <TableCell className="font-medium">{pos.symbol}</TableCell>
-                  <TableCell>
-                    <Badge variant={pos.side === 'long' ? 'default' : 'destructive'} className={pos.side === 'long' ? 'bg-profit text-background' : ''}>
-                      {pos.side}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">{formatQuantity(pos.quantity)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(pos.avgCostBasis)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(pos.currentPrice)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(pos.marketValue)}</TableCell>
-                  <TableCell className={cn('text-right font-mono', pnlColor(pos.unrealizedPnl))}>
-                    {formatCurrency(pos.unrealizedPnl)}
-                  </TableCell>
+          <div className="overflow-x-auto -mx-6 px-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Symbol</TableHead>
+                  <TableHead>Side</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Avg Cost</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Price</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">Market Value</TableHead>
+                  <TableHead className="text-right">P&L</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {positions.map((pos) => (
+                  <TableRow key={pos.id}>
+                    <TableCell className="font-medium">{pos.symbol}</TableCell>
+                    <TableCell>
+                      <Badge variant={pos.side === 'long' ? 'default' : 'destructive'} className={pos.side === 'long' ? 'bg-profit text-background' : ''}>
+                        {pos.side}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">{formatQuantity(pos.quantity)}</TableCell>
+                    <TableCell className="text-right font-mono hidden sm:table-cell">{formatCurrency(pos.avgCostBasis)}</TableCell>
+                    <TableCell className="text-right font-mono hidden sm:table-cell">{formatCurrency(pos.currentPrice)}</TableCell>
+                    <TableCell className="text-right font-mono hidden md:table-cell">{formatCurrency(pos.marketValue)}</TableCell>
+                    <TableCell className={cn('text-right font-mono', pnlColor(pos.unrealizedPnl))}>
+                      {formatCurrency(pos.unrealizedPnl)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>
