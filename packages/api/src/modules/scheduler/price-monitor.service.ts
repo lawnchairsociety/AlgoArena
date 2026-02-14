@@ -1,5 +1,5 @@
 import { OrderSide, OrderType } from '@algoarena/shared';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { and, eq, inArray } from 'drizzle-orm';
 import { DrizzleProvider } from '../database/drizzle.provider';
@@ -64,7 +64,12 @@ export class PriceMonitorService {
           this.logger.log(`Filled ${order.type} order ${order.id} for ${order.symbol} @ ${fillPrice.toFixed(4)}`);
         }
       } catch (error) {
-        this.logger.error(`Error evaluating order ${order.id}: ${error instanceof Error ? error.message : error}`);
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof BadRequestException) {
+          await this.rejectOrder(order.id, message);
+        } else {
+          this.logger.error(`Error evaluating order ${order.id}: ${message}`);
+        }
       }
     }
 
@@ -106,10 +111,23 @@ export class PriceMonitorService {
         filled++;
         this.logger.log(`Filled queued market order ${order.id} for ${order.symbol} @ ${fillPrice.toFixed(4)}`);
       } catch (error) {
-        this.logger.error(`Error filling market order ${order.id}: ${error instanceof Error ? error.message : error}`);
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof BadRequestException) {
+          await this.rejectOrder(order.id, message);
+        } else {
+          this.logger.error(`Error filling market order ${order.id}: ${message}`);
+        }
       }
     }
 
     this.logger.log(`Market open: filled ${filled}/${marketOrders.length} queued market orders`);
+  }
+
+  private async rejectOrder(orderId: string, reason: string): Promise<void> {
+    await this.drizzle.db
+      .update(orders)
+      .set({ status: 'rejected', rejectionReason: reason, updatedAt: new Date() })
+      .where(eq(orders.id, orderId));
+    this.logger.warn(`Rejected order ${orderId}: ${reason}`);
   }
 }
