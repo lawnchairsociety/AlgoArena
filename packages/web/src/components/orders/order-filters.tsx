@@ -12,9 +12,9 @@ interface OrderFiltersProps {
 
 export function OrderFilters({ status, symbol, onStatusChange, onSymbolChange }: OrderFiltersProps) {
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-3 w-full sm:w-auto">
       <Select value={status} onValueChange={onStatusChange}>
-        <SelectTrigger className="w-44">
+        <SelectTrigger className="w-full sm:w-44">
           <SelectValue placeholder="All statuses" />
         </SelectTrigger>
         <SelectContent>
@@ -30,7 +30,7 @@ export function OrderFilters({ status, symbol, onStatusChange, onSymbolChange }:
         placeholder="Filter by symbol..."
         value={symbol}
         onChange={(e) => onSymbolChange(e.target.value.toUpperCase())}
-        className="w-40"
+        className="w-full sm:w-40"
       />
     </div>
   );

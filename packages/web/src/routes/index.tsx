@@ -12,7 +12,7 @@ function LandingPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center p-4">
       <FloatingCandles />
-      <div className="flex w-full max-w-md flex-col gap-6 pt-8">
+      <div className="flex w-full max-w-3xl flex-col gap-6 pt-8">
         <InfoBox />
         <CuidEntryBox />
         <ActivityChartBox />

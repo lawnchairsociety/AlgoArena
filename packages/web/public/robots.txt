@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /agent-guide.md
+Allow: /llms.txt
+Allow: /api/v1/openapi.json
+Allow: /agent-guide
+Disallow: /dashboard/

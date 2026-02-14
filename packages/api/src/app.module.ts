@@ -14,8 +14,10 @@ import { WebSocketModule } from './modules/websocket/websocket.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { ThrottleValkeyStorage } from './common/throttle/throttle-valkey.storage';
 import { CuidThrottlerGuard } from './common/throttle/cuid-throttler.guard';
+import { HealthController } from './modules/health/health.controller';
 
 @Module({
+  controllers: [HealthController],
   imports: [
     AppConfigModule,
     EventEmitterModule.forRoot(),

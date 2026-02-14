@@ -1,0 +1,9 @@
+# AlgoArena
+
+> Paper trading platform for testing algorithmic and AI trading strategies against real-time market data.
+
+## Documentation
+
+- [Agent Guide (Markdown)](/agent-guide.md): Complete API reference for AI agents and trading bots
+- [OpenAPI Spec](/api/v1/openapi.json): Full OpenAPI 3.0 specification
+- [Interactive API Docs](/docs): Scalar API documentation UI

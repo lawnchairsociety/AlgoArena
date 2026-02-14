@@ -8,9 +8,40 @@ const navItems = [
   { to: '/dashboard/$cuid/market' as const, label: 'Market', icon: BarChart3 },
 ];
 
-export function DashboardNav({ cuid }: { cuid: string }) {
+interface DashboardNavProps {
+  cuid: string;
+  variant: 'sidebar' | 'bottom';
+}
+
+export function DashboardNav({ cuid, variant }: DashboardNavProps) {
   const matches = useMatches();
   const currentPath = matches[matches.length - 1]?.fullPath;
+
+  if (variant === 'bottom') {
+    return (
+      <div className="flex items-center justify-around py-2">
+        {navItems.map((item) => {
+          const isActive = currentPath === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              params={{ cuid }}
+              className={cn(
+                'flex flex-col items-center gap-1 px-4 py-1 text-xs font-medium transition-colors',
+                isActive
+                  ? 'text-foreground'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <nav className="flex flex-col gap-1 p-3">

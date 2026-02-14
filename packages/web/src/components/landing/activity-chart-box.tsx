@@ -46,6 +46,7 @@ export function ActivityChartBox() {
                 }}
                 labelStyle={{ color: 'hsl(210, 20%, 92%)' }}
                 labelFormatter={(label: string) => new Date(label).toLocaleDateString()}
+                cursor={{ fill: 'transparent' }}
               />
               <Bar dataKey="tradeCount" fill="hsl(210, 60%, 55%)" radius={[3, 3, 0, 0]} name="Trades" />
             </BarChart>
