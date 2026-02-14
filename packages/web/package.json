@@ -1,0 +1,39 @@
+{
+  "name": "@algoarena/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@tanstack/react-router": "^1.95.0",
+    "@tanstack/react-query": "^5.65.0",
+    "zustand": "^5.0.3",
+    "axios": "^1.7.9",
+    "recharts": "^2.15.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.0.1",
+    "class-variance-authority": "^0.7.1",
+    "lucide-react": "^0.474.0",
+    "@radix-ui/react-slot": "^1.1.1",
+    "@radix-ui/react-select": "^2.1.6",
+    "@radix-ui/react-tabs": "^1.1.3",
+    "@radix-ui/react-tooltip": "^1.1.8",
+    "@radix-ui/react-separator": "^1.1.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.1.0",
+    "tailwindcss": "^4.0.6",
+    "@tailwindcss/vite": "^4.0.6",
+    "@tanstack/router-plugin": "^1.95.0"
+  }
+}
