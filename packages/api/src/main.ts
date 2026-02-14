@@ -60,8 +60,7 @@ async function bootstrap() {
 
   // Serve Scalar API docs at /docs
   const fastify = app.getHttpAdapter().getInstance();
-  fastify.get('/docs', (req: any, reply: any) => {
-    reply.type('text/html').send(`<!doctype html>
+  const scalarHtml = `<!doctype html>
 <html>
 <head>
   <title>AlgoArena API Docs</title>
@@ -72,8 +71,11 @@ async function bootstrap() {
   <script id="api-reference" data-url="/${API_PREFIX}/openapi.json"></script>
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
-</html>`);
-  });
+</html>`;
+  const sendDocs = (_req: any, reply: any) =>
+    reply.type('text/html').send(scalarHtml);
+  fastify.get('/docs', sendDocs);
+  fastify.get('/docs/', sendDocs);
 
   const port = parseInt(process.env.PORT || '3000', 10);
   await app.listen({ port, host: '0.0.0.0' });
