@@ -4,14 +4,25 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    assignees:
+      - "lawnchairsociety"
+    labels:
+      - "dependencies"
     groups:
       production:
         dependency-type: "production"
       development:
         dependency-type: "development"
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+    assignees:
+      - "lawnchairsociety"
+    labels:
+      - "dependencies"
