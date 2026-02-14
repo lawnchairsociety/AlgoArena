@@ -1,12 +1,5 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  UseGuards,
-  BadRequestException,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiSecurity, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CuidGuard } from '../../common/guards/cuid.guard';
 import { MarketDataService } from './market-data.service';
@@ -28,7 +21,10 @@ export class MarketDataController {
     if (!symbols) {
       throw new BadRequestException('symbols query parameter is required');
     }
-    const list = symbols.split(',').map((s) => s.trim()).filter(Boolean);
+    const list = symbols
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (list.length === 0) {
       throw new BadRequestException('At least one symbol is required');
     }
@@ -89,10 +85,7 @@ export class MarketDataController {
   @ApiQuery({ name: 'status', description: 'Filter by status (e.g. active)', required: false })
   @ApiQuery({ name: 'asset_class', description: 'Filter by asset class (e.g. us_equity)', required: false })
   @ApiResponse({ status: 200, description: 'Assets returned' })
-  async getAssets(
-    @Query('status') status?: string,
-    @Query('asset_class') assetClass?: string,
-  ) {
+  async getAssets(@Query('status') status?: string, @Query('asset_class') assetClass?: string) {
     return this.marketData.getAssets({
       status: status || undefined,
       asset_class: assetClass || undefined,
@@ -104,10 +97,7 @@ export class MarketDataController {
   @ApiQuery({ name: 'start', description: 'Start date (YYYY-MM-DD)', required: false })
   @ApiQuery({ name: 'end', description: 'End date (YYYY-MM-DD)', required: false })
   @ApiResponse({ status: 200, description: 'Calendar returned' })
-  async getCalendar(
-    @Query('start') start?: string,
-    @Query('end') end?: string,
-  ) {
+  async getCalendar(@Query('start') start?: string, @Query('end') end?: string) {
     return this.marketData.getCalendar({
       start: start || undefined,
       end: end || undefined,

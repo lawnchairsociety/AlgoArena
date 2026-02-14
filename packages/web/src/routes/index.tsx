@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { ActivityChartBox } from '@/components/landing/activity-chart-box';
+import { CuidEntryBox } from '@/components/landing/cuid-entry-box';
 import { FloatingCandles } from '@/components/landing/floating-candles';
 import { InfoBox } from '@/components/landing/info-box';
-import { CuidEntryBox } from '@/components/landing/cuid-entry-box';
-import { ActivityChartBox } from '@/components/landing/activity-chart-box';
 
 export const Route = createFileRoute('/')({
   component: LandingPage,

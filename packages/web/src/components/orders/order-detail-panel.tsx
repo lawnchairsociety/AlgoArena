@@ -1,10 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
-import { OrderStatusBadge } from './order-status-badge';
 import { useOrder } from '@/api/hooks/use-orders';
-import { formatCurrency, formatQuantity, formatDateTime } from '@/lib/format';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { formatCurrency, formatDateTime, formatQuantity } from '@/lib/format';
+import { OrderStatusBadge } from './order-status-badge';
 
 export function OrderDetailPanel({ orderId, onClose }: { orderId: string; onClose: () => void }) {
   const { data: order, isLoading } = useOrder(orderId);
@@ -44,7 +44,7 @@ export function OrderDetailPanel({ orderId, onClose }: { orderId: string; onClos
         <CardTitle className="text-base">Order Detail</CardTitle>
         <div className="flex items-center gap-2">
           <OrderStatusBadge status={order.status} />
-          <button onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground">
             Close
           </button>
         </div>

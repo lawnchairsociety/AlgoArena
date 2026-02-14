@@ -1,6 +1,6 @@
-import { pgTable, uuid, text, numeric, date, timestamp } from 'drizzle-orm/pg-core';
-import { orders } from './orders';
+import { date, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { cuidUsers } from './cuid-users';
+import { orders } from './orders';
 
 export const dayTrades = pgTable('day_trades', {
   id: uuid('id').primaryKey().defaultRandom(),

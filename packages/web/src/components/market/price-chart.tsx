@@ -1,16 +1,8 @@
 import { useState } from 'react';
+import { Bar, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useBars } from '@/api/hooks/use-bars';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useBars } from '@/api/hooks/use-bars';
-import {
-  ComposedChart,
-  Line,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
 import { formatCurrency } from '@/lib/format';
 
 const timeframes = [
@@ -36,6 +28,7 @@ export function PriceChart({ symbol }: { symbol: string }) {
         <div className="flex gap-1">
           {timeframes.map((tf) => (
             <button
+              type="button"
               key={tf.value}
               onClick={() => setTimeframe(tf.value)}
               className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${

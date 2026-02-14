@@ -1,26 +1,17 @@
+import { IncomingMessage } from 'node:http';
+import { WS_HEARTBEAT_INTERVAL_MS, WS_PATH, WsEventEnvelope, WsEventType } from '@algoarena/shared';
 import { Logger, OnModuleDestroy } from '@nestjs/common';
-import {
-  WebSocketGateway,
-  OnGatewayInit,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-} from '@nestjs/websockets';
 import { OnEvent } from '@nestjs/event-emitter';
+import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, WebSocketGateway } from '@nestjs/websockets';
 import { WebSocket, WebSocketServer } from 'ws';
-import type { IncomingMessage } from 'http';
-import {
-  WS_PATH,
-  WS_HEARTBEAT_INTERVAL_MS,
-} from '@algoarena/shared';
-import type { WsEventType, WsEventEnvelope } from '@algoarena/shared';
-import { WsAuthService } from './ws-auth.service';
 import { ConnectionRegistryService } from './connection-registry.service';
-import type {
-  OrderEventPayload,
-  MarginWarningPayload,
+import { WsAuthService } from './ws-auth.service';
+import {
   MarginLiquidationPayload,
-  PdtWarningPayload,
+  MarginWarningPayload,
+  OrderEventPayload,
   PdtRestrictedPayload,
+  PdtWarningPayload,
 } from './ws-event.types';
 
 interface TaggedWebSocket extends WebSocket {
@@ -29,20 +20,16 @@ interface TaggedWebSocket extends WebSocket {
 }
 
 @WebSocketGateway({ path: WS_PATH })
-export class AlgoArenaGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
-{
+export class AlgoArenaGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
   private readonly logger = new Logger(AlgoArenaGateway.name);
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-  private server!: WebSocketServer;
 
   constructor(
     private readonly wsAuth: WsAuthService,
     private readonly registry: ConnectionRegistryService,
   ) {}
 
-  afterInit(server: WebSocketServer): void {
-    this.server = server;
+  afterInit(_server: WebSocketServer): void {
     this.logger.log(`WebSocket gateway initialized on ${WS_PATH}`);
 
     this.heartbeatInterval = setInterval(() => {

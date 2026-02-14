@@ -1,33 +1,18 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { INITIAL_MARGIN_REQUIREMENT } from '@algoarena/shared';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { eq, and, desc, sql } from 'drizzle-orm';
 import Decimal from 'decimal.js';
-import {
-  INITIAL_MARGIN_REQUIREMENT,
-} from '@algoarena/shared';
-import type { OrderStatus } from '@algoarena/shared';
+import { and, desc, eq } from 'drizzle-orm';
+import { CuidUserRecord } from '../../common/interfaces/authenticated-request.interface';
 import { DrizzleProvider } from '../database/drizzle.provider';
-import {
-  orders,
-  fills,
-  positions,
-  cuidUsers,
-  borrowFeeTiers,
-} from '../database/schema';
-import { MarketDataService } from '../market-data/market-data.service';
+import { borrowFeeTiers, cuidUsers, fills, orders, positions } from '../database/schema';
 import { MarketDataProvider } from '../market-data/market-data.provider';
+import { MarketDataService } from '../market-data/market-data.service';
+import { OrderEventPayload } from '../websocket/ws-event.types';
+import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
+import { PlaceOrderDto } from './dto/place-order.dto';
 import { OrderEngineService } from './order-engine.service';
 import { PdtService } from './pdt.service';
-import type { PlaceOrderDto } from './dto/place-order.dto';
-import type { ListOrdersQueryDto } from './dto/list-orders-query.dto';
-import type { CuidUserRecord } from '../../common/interfaces/authenticated-request.interface';
-import type { OrderEventPayload } from '../websocket/ws-event.types';
 
 @Injectable()
 export class TradingService {
@@ -61,11 +46,7 @@ export class TradingService {
     ]);
 
     // 4. Load fresh user + existing position
-    const [user] = await this.drizzle.db
-      .select()
-      .from(cuidUsers)
-      .where(eq(cuidUsers.id, cuidUserId))
-      .limit(1);
+    const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, cuidUserId)).limit(1);
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -78,18 +59,12 @@ export class TradingService {
       .where(eq(positions.id, positionId))
       .limit(1);
 
-    const currentPositionQty = existingPosition
-      ? new Decimal(existingPosition.quantity)
-      : new Decimal(0);
+    const currentPositionQty = existingPosition ? new Decimal(existingPosition.quantity) : new Decimal(0);
     const fillQuantity = new Decimal(dto.quantity);
 
     // 5. Determine intent
-    const isShortSell =
-      dto.side === 'sell' &&
-      (currentPositionQty.lte(0) ||
-        fillQuantity.gt(currentPositionQty));
-    const isCover =
-      dto.side === 'buy' && currentPositionQty.lt(0);
+    const isShortSell = dto.side === 'sell' && (currentPositionQty.lte(0) || fillQuantity.gt(currentPositionQty));
+    const isCover = dto.side === 'buy' && currentPositionQty.lt(0);
 
     // 6. Short sell checks
     if (isShortSell) {
@@ -114,13 +89,9 @@ export class TradingService {
       // SSR check → DEFERRED (TODO: implement SSR check)
 
       // Margin check
-      const shortQty = currentPositionQty.gt(0)
-        ? fillQuantity.minus(currentPositionQty)
-        : fillQuantity;
+      const shortQty = currentPositionQty.gt(0) ? fillQuantity.minus(currentPositionQty) : fillQuantity;
       const estimatedFillPrice = new Decimal(quote.askPrice);
-      const marginRequired = estimatedFillPrice
-        .mul(shortQty)
-        .mul(INITIAL_MARGIN_REQUIREMENT);
+      const marginRequired = estimatedFillPrice.mul(shortQty).mul(INITIAL_MARGIN_REQUIREMENT);
       const cash = new Decimal(user.cashBalance);
       const marginUsed = new Decimal(user.marginUsed);
       const availableMargin = cash.minus(marginUsed);
@@ -143,7 +114,7 @@ export class TradingService {
 
     // 8. Buying power check
     const askPrice = new Decimal(quote.askPrice);
-    const bidPrice = new Decimal(quote.bidPrice);
+    const _bidPrice = new Decimal(quote.bidPrice);
     const cash = new Decimal(user.cashBalance);
 
     if (dto.side === 'buy') {
@@ -244,10 +215,7 @@ export class TradingService {
       // limit/stop/stop_limit with day/gtc → stays pending (PriceMonitorService evaluates later)
     } catch (error) {
       // If fill fails, reject the order
-      const rejectionReason =
-        error instanceof BadRequestException
-          ? error.message
-          : 'Internal error during fill';
+      const rejectionReason = error instanceof BadRequestException ? error.message : 'Internal error during fill';
 
       if (!(error instanceof BadRequestException)) {
         this.logger.error(`Fill failed for order ${order.id}`, error);
@@ -283,9 +251,7 @@ export class TradingService {
     }
 
     if (order.status !== 'pending' && order.status !== 'partially_filled') {
-      throw new BadRequestException(
-        `Cannot cancel order with status '${order.status}'`,
-      );
+      throw new BadRequestException(`Cannot cancel order with status '${order.status}'`);
     }
 
     await this.cancelOrderById(orderId);
@@ -332,10 +298,7 @@ export class TradingService {
     }
 
     // Include fills
-    const orderFills = await this.drizzle.db
-      .select()
-      .from(fills)
-      .where(eq(fills.orderId, orderId));
+    const orderFills = await this.drizzle.db.select().from(fills).where(eq(fills.orderId, orderId));
 
     return { ...order, fills: orderFills };
   }
@@ -346,10 +309,7 @@ export class TradingService {
     const cash = new Decimal(user.cashBalance);
 
     // Get all positions for the user
-    const userPositions = await this.drizzle.db
-      .select()
-      .from(positions)
-      .where(eq(positions.cuidUserId, user.id));
+    const userPositions = await this.drizzle.db.select().from(positions).where(eq(positions.cuidUserId, user.id));
 
     if (userPositions.length === 0) {
       return cash;
@@ -365,9 +325,7 @@ export class TradingService {
       const quote = quotes[pos.symbol];
       if (quote) {
         // For longs use bid, for shorts use ask
-        const price = qty.gt(0)
-          ? new Decimal(quote.bidPrice)
-          : new Decimal(quote.askPrice);
+        const price = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
         positionsValue = positionsValue.plus(qty.mul(price));
       }
     }
@@ -381,34 +339,20 @@ export class TradingService {
       throw new BadRequestException('Quantity must be greater than 0');
     }
 
-    if (
-      (dto.type === 'limit' || dto.type === 'stop_limit') &&
-      !dto.limitPrice
-    ) {
-      throw new BadRequestException(
-        `limitPrice is required for ${dto.type} orders`,
-      );
+    if ((dto.type === 'limit' || dto.type === 'stop_limit') && !dto.limitPrice) {
+      throw new BadRequestException(`limitPrice is required for ${dto.type} orders`);
     }
 
-    if (
-      (dto.type === 'stop' || dto.type === 'stop_limit') &&
-      !dto.stopPrice
-    ) {
-      throw new BadRequestException(
-        `stopPrice is required for ${dto.type} orders`,
-      );
+    if ((dto.type === 'stop' || dto.type === 'stop_limit') && !dto.stopPrice) {
+      throw new BadRequestException(`stopPrice is required for ${dto.type} orders`);
     }
 
     if (dto.type === 'market') {
       if (dto.limitPrice) {
-        throw new BadRequestException(
-          'limitPrice must not be set for market orders',
-        );
+        throw new BadRequestException('limitPrice must not be set for market orders');
       }
       if (dto.stopPrice) {
-        throw new BadRequestException(
-          'stopPrice must not be set for market orders',
-        );
+        throw new BadRequestException('stopPrice must not be set for market orders');
       }
     }
 

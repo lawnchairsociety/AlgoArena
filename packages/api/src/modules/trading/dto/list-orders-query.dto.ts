@@ -1,6 +1,6 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { ORDER_STATUSES, OrderStatus } from '@algoarena/shared';
 import { Type } from 'class-transformer';
-import { ORDER_STATUSES, type OrderStatus } from '@algoarena/shared';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class ListOrdersQueryDto {
   @IsOptional()

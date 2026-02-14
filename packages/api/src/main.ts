@@ -1,17 +1,14 @@
+import { API_PREFIX } from '@algoarena/shared';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { WsAdapter } from '@nestjs/platform-ws';
-import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { API_PREFIX } from '@algoarena/shared';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule,
-    new FastifyAdapter(),
-  );
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
 
   app.setGlobalPrefix(API_PREFIX);
   app.useWebSocketAdapter(new WsAdapter(app));
@@ -33,12 +30,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:5173', // Vite dev server
     ],
-    allowedHeaders: [
-      'Content-Type',
-      'x-algoarena-api-key',
-      'x-algoarena-cuid',
-      'x-master-key',
-    ],
+    allowedHeaders: ['Content-Type', 'x-algoarena-api-key', 'x-algoarena-cuid', 'x-master-key'],
   });
 
   // Swagger / OpenAPI
@@ -72,8 +64,7 @@ async function bootstrap() {
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`;
-  const sendDocs = (_req: any, reply: any) =>
-    reply.type('text/html').send(scalarHtml);
+  const sendDocs = (_req: any, reply: any) => reply.type('text/html').send(scalarHtml);
   fastify.get('/docs', sendDocs);
   fastify.get('/docs/', sendDocs);
 

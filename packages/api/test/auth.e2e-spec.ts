@@ -1,12 +1,12 @@
-import * as request from 'supertest';
-import { createTestApp, closeTestApp } from './setup';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import * as request from 'supertest';
+import { closeTestApp, createTestApp } from './setup';
 
 describe('Auth (e2e)', () => {
   let app: NestFastifyApplication;
   let masterKey: string;
   let apiKey: string;
-  let apiKeyId: string;
+  let _apiKeyId: string;
   let userCuid: string;
 
   beforeAll(async () => {
@@ -28,7 +28,7 @@ describe('Auth (e2e)', () => {
     expect(res.body).toHaveProperty('id');
     expect(res.body).toHaveProperty('key');
     expect(res.body.label).toBe('e2e-test');
-    apiKeyId = res.body.id;
+    _apiKeyId = res.body.id;
     apiKey = res.body.key;
   });
 

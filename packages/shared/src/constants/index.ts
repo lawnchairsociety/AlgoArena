@@ -27,8 +27,8 @@ export const MODERATE_MAX_DAYS_TO_COVER = 7;
 
 export const HARD_BORROW_MAX_MARKET_CAP = 500_000_000; // $500M
 export const HARD_BORROW_MIN_SHORT_INTEREST = 0.15; // 15%
-export const HIGH_SHORT_INTEREST_THRESHOLD = 0.20; // 20%
-export const NOT_SHORTABLE_SHORT_INTEREST = 0.40; // 40%
+export const HIGH_SHORT_INTEREST_THRESHOLD = 0.2; // 20%
+export const NOT_SHORTABLE_SHORT_INTEREST = 0.4; // 40%
 
 // ── PDT constants ──
 

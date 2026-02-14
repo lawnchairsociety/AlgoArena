@@ -1,6 +1,6 @@
-import * as request from 'supertest';
-import { createTestApp, closeTestApp } from './setup';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import * as request from 'supertest';
+import { closeTestApp, createTestApp } from './setup';
 
 describe('Trading (e2e)', () => {
   let app: NestFastifyApplication;

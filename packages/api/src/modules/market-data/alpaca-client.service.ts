@@ -1,27 +1,27 @@
-import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ALPACA_DATA_BASE_URL } from '@algoarena/shared';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MarketDataProvider } from './market-data.provider';
-import type {
-  Quote,
-  BarsResponse,
-  Bar,
-  Snapshot,
-  MarketClock,
-  Asset,
-  CalendarDay,
-} from './types/market-data-provider.types';
-import type {
-  AlpacaQuote,
-  AlpacaQuoteResponse,
-  AlpacaMultiQuoteResponse,
+import {
+  AlpacaAsset,
   AlpacaBar,
   AlpacaBarsResponse,
-  AlpacaSnapshot,
-  AlpacaClock,
-  AlpacaAsset,
   AlpacaCalendarDay,
+  AlpacaClock,
+  AlpacaMultiQuoteResponse,
+  AlpacaQuote,
+  AlpacaQuoteResponse,
+  AlpacaSnapshot,
 } from './types/alpaca.types';
+import {
+  Asset,
+  Bar,
+  BarsResponse,
+  CalendarDay,
+  MarketClock,
+  Quote,
+  Snapshot,
+} from './types/market-data-provider.types';
 
 @Injectable()
 export class AlpacaClientService extends MarketDataProvider {
@@ -43,17 +43,14 @@ export class AlpacaClientService extends MarketDataProvider {
   // ── MarketDataProvider Implementation ──
 
   async getLatestQuote(symbol: string): Promise<Quote> {
-    const res = await this.dataRequest<AlpacaQuoteResponse>(
-      `/v2/stocks/${encodeURIComponent(symbol)}/quotes/latest`,
-    );
+    const res = await this.dataRequest<AlpacaQuoteResponse>(`/v2/stocks/${encodeURIComponent(symbol)}/quotes/latest`);
     return this.mapQuote(res.quote);
   }
 
   async getLatestQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-    const res = await this.dataRequest<AlpacaMultiQuoteResponse>(
-      '/v2/stocks/quotes/latest',
-      { symbols: symbols.join(',') },
-    );
+    const res = await this.dataRequest<AlpacaMultiQuoteResponse>('/v2/stocks/quotes/latest', {
+      symbols: symbols.join(','),
+    });
     const result: Record<string, Quote> = {};
     for (const [sym, quote] of Object.entries(res.quotes)) {
       result[sym] = this.mapQuote(quote);
@@ -77,9 +74,7 @@ export class AlpacaClientService extends MarketDataProvider {
   }
 
   async getSnapshot(symbol: string): Promise<Snapshot> {
-    const res = await this.dataRequest<AlpacaSnapshot>(
-      `/v2/stocks/${encodeURIComponent(symbol)}/snapshot`,
-    );
+    const res = await this.dataRequest<AlpacaSnapshot>(`/v2/stocks/${encodeURIComponent(symbol)}/snapshot`);
     return {
       latestTrade: {
         timestamp: res.latestTrade.t,
@@ -103,25 +98,17 @@ export class AlpacaClientService extends MarketDataProvider {
     };
   }
 
-  async getAssets(params?: {
-    status?: string;
-    asset_class?: string;
-  }): Promise<Asset[]> {
+  async getAssets(params?: { status?: string; asset_class?: string }): Promise<Asset[]> {
     const res = await this.tradingRequest<AlpacaAsset[]>('/v2/assets', params);
     return res.map((a) => this.mapAsset(a));
   }
 
   async getAsset(symbol: string): Promise<Asset> {
-    const res = await this.tradingRequest<AlpacaAsset>(
-      `/v2/assets/${encodeURIComponent(symbol)}`,
-    );
+    const res = await this.tradingRequest<AlpacaAsset>(`/v2/assets/${encodeURIComponent(symbol)}`);
     return this.mapAsset(res);
   }
 
-  async getCalendar(params?: {
-    start?: string;
-    end?: string;
-  }): Promise<CalendarDay[]> {
+  async getCalendar(params?: { start?: string; end?: string }): Promise<CalendarDay[]> {
     const res = await this.tradingRequest<AlpacaCalendarDay[]>('/v2/calendar', params);
     return res.map((d) => ({
       date: d.date,
@@ -176,17 +163,11 @@ export class AlpacaClientService extends MarketDataProvider {
 
   // ── Private HTTP Helpers ──
 
-  private async dataRequest<T>(
-    path: string,
-    params?: Record<string, string | number | undefined>,
-  ): Promise<T> {
+  private async dataRequest<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
     return this.request<T>(ALPACA_DATA_BASE_URL, path, { ...params, feed: 'sip' });
   }
 
-  private async tradingRequest<T>(
-    path: string,
-    params?: Record<string, string | number | undefined>,
-  ): Promise<T> {
+  private async tradingRequest<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
     return this.request<T>(this.tradingBaseUrl, path, params);
   }
 
@@ -214,9 +195,7 @@ export class AlpacaClientService extends MarketDataProvider {
       this.logger.error(`Alpaca API error ${response.status}: ${body}`);
       throw new HttpException(
         `Alpaca API error: ${response.statusText}`,
-        response.status >= 500
-          ? HttpStatus.BAD_GATEWAY
-          : HttpStatus.BAD_REQUEST,
+        response.status >= 500 ? HttpStatus.BAD_GATEWAY : HttpStatus.BAD_REQUEST,
       );
     }
 

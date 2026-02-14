@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Build, Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint & format check
+        run: pnpm lint
+
+      - name: Build shared
+        run: pnpm build:shared
+
+      - name: Type-check API
+        run: pnpm --filter @algoarena/api exec tsc --noEmit
+
+      - name: Build API
+        run: pnpm build:api
+
+      - name: Unit tests
+        run: pnpm test:unit

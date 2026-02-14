@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, numeric, date, timestamp } from 'drizzle-orm/pg-core';
+import { date, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { cuidUsers } from './cuid-users';
 
 export const portfolioSnapshots = pgTable('portfolio_snapshots', {

@@ -1,9 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 
@@ -14,9 +11,7 @@ export async function createTestApp(): Promise<NestFastifyApplication> {
     imports: [AppModule],
   }).compile();
 
-  app = moduleFixture.createNestApplication<NestFastifyApplication>(
-    new FastifyAdapter(),
-  );
+  app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
 
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(

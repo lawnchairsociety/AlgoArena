@@ -1,27 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
 import {
-  CACHE_TTL_QUOTES,
-  CACHE_TTL_BARS,
-  CACHE_TTL_SNAPSHOTS,
-  CACHE_TTL_CLOCK,
   CACHE_TTL_ASSETS,
+  CACHE_TTL_BARS,
   CACHE_TTL_CALENDAR,
+  CACHE_TTL_CLOCK,
+  CACHE_TTL_QUOTES,
+  CACHE_TTL_SNAPSHOTS,
 } from '@algoarena/shared';
+import { Injectable } from '@nestjs/common';
 import { ValkeyProvider } from '../cache/valkey.provider';
 import { MarketDataProvider } from './market-data.provider';
-import type {
-  Quote,
-  BarsResponse,
-  Snapshot,
-  MarketClock,
-  Asset,
-  CalendarDay,
-} from './types/market-data-provider.types';
+import { Asset, BarsResponse, CalendarDay, MarketClock, Quote, Snapshot } from './types/market-data-provider.types';
 
 @Injectable()
 export class MarketDataService {
-  private readonly logger = new Logger(MarketDataService.name);
-
   constructor(
     private readonly cache: ValkeyProvider,
     private readonly provider: MarketDataProvider,
@@ -107,10 +98,7 @@ export class MarketDataService {
 
   // ── Assets ──
 
-  async getAssets(params?: {
-    status?: string;
-    asset_class?: string;
-  }): Promise<Asset[]> {
+  async getAssets(params?: { status?: string; asset_class?: string }): Promise<Asset[]> {
     const isFiltered = params?.status || params?.asset_class;
 
     if (!isFiltered) {
@@ -129,10 +117,7 @@ export class MarketDataService {
 
   // ── Calendar ──
 
-  async getCalendar(params?: {
-    start?: string;
-    end?: string;
-  }): Promise<CalendarDay[]> {
+  async getCalendar(params?: { start?: string; end?: string }): Promise<CalendarDay[]> {
     const key = `market:calendar:${params?.start ?? ''}:${params?.end ?? ''}`;
     const cached = await this.cache.get<CalendarDay[]>(key);
     if (cached) return cached;

@@ -1,6 +1,6 @@
-import { pgTable, uuid, text, numeric, timestamp } from 'drizzle-orm/pg-core';
-import { orderSideEnum, orderTypeEnum, timeInForceEnum, orderStatusEnum } from './enums';
+import { numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { cuidUsers } from './cuid-users';
+import { orderSideEnum, orderStatusEnum, orderTypeEnum, timeInForceEnum } from './enums';
 
 export const orders = pgTable('orders', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -12,9 +12,7 @@ export const orders = pgTable('orders', {
   type: orderTypeEnum('type').notNull(),
   timeInForce: timeInForceEnum('time_in_force').notNull(),
   quantity: numeric('quantity', { precision: 14, scale: 6 }).notNull(),
-  filledQuantity: numeric('filled_quantity', { precision: 14, scale: 6 })
-    .notNull()
-    .default('0'),
+  filledQuantity: numeric('filled_quantity', { precision: 14, scale: 6 }).notNull().default('0'),
   limitPrice: numeric('limit_price', { precision: 14, scale: 4 }),
   stopPrice: numeric('stop_price', { precision: 14, scale: 4 }),
   avgFillPrice: numeric('avg_fill_price', { precision: 14, scale: 4 }),

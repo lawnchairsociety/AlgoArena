@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MarketDataModule } from '../market-data/market-data.module';
 import { TradingModule } from '../trading/trading.module';
-import { PortfolioService } from './portfolio.service';
 import { PortfolioController } from './portfolio.controller';
+import { PortfolioService } from './portfolio.service';
 
 @Module({
   imports: [MarketDataModule, TradingModule],

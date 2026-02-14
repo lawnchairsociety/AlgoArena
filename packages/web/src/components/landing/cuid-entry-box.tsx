@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import { LogIn } from 'lucide-react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { LogIn } from 'lucide-react';
 
 export function CuidEntryBox() {
   const [cuid, setCuid] = useState('');

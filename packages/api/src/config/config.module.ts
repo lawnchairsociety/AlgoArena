@@ -1,6 +1,6 @@
-import { Module, Global } from '@nestjs/common';
+import { join } from 'node:path';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { join } from 'path';
 import { validateEnv } from './env.validation';
 
 @Global()
