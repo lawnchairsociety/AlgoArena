@@ -3,7 +3,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { WsAdapter } from '@nestjs/platform-ws';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { apiReference } from '@scalar/nestjs-api-reference';
+import ScalarApiReference from '@scalar/fastify-api-reference';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { API_PREFIX } from '@algoarena/shared';
@@ -60,13 +60,12 @@ async function bootstrap() {
   });
 
   // Serve Scalar API docs at /docs
-  app.getHttpAdapter().getInstance().get(
-    '/docs',
-    apiReference({
-      withFastify: true,
+  await app.getHttpAdapter().getInstance().register(ScalarApiReference, {
+    routePrefix: '/docs',
+    configuration: {
       url: `/${API_PREFIX}/openapi.json`,
-    }) as any,
-  );
+    },
+  });
 
   const port = parseInt(process.env.PORT || '3000', 10);
   await app.listen({ port, host: '0.0.0.0' });
