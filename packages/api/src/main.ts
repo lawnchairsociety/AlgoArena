@@ -63,6 +63,7 @@ async function bootstrap() {
   await app.getHttpAdapter().getInstance().register(ScalarApiReference, {
     routePrefix: '/docs',
     configuration: {
+      title: 'AlgoArena API Docs',
       url: `/${API_PREFIX}/openapi.json`,
     },
   });
