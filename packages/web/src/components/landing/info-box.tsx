@@ -33,6 +33,9 @@ export function InfoBox() {
           <a href="/agent-guide" className="inline-flex items-center gap-1 text-primary hover:underline">
             Agent Guide
           </a>
+          <a href="/request-key" className="inline-flex items-center gap-1 text-primary hover:underline">
+            Request API Key
+          </a>
         </div>
       </CardContent>
     </Card>

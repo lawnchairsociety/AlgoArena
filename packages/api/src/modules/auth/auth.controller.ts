@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { ApiKey } from '../../common/decorators/api-key.decorator';
 import { CuidUser } from '../../common/decorators/cuid-user.decorator';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
@@ -10,6 +10,7 @@ import { ApiKeyRecord, CuidUserRecord } from '../../common/interfaces/authentica
 import { AuthService } from './auth.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { CreateCuidUserDto } from './dto/create-cuid-user.dto';
+import { RequestKeyDto } from './dto/request-key.dto';
 import { ResetAccountDto } from './dto/reset-account.dto';
 
 @ApiTags('Auth')
@@ -17,6 +18,17 @@ import { ResetAccountDto } from './dto/reset-account.dto';
 @SkipThrottle()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('request-key')
+  @Throttle({ auth: { ttl: 900000, limit: 3 } })
+  @ApiOperation({ summary: 'Request an API key' })
+  @ApiResponse({ status: 201, description: 'Request submitted' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  @ApiResponse({ status: 503, description: 'Email notifications not configured' })
+  async requestKey(@Body() dto: RequestKeyDto) {
+    await this.authService.requestKey(dto);
+    return { message: 'Your request has been submitted. You will receive an email when your API key is ready.' };
+  }
 
   @Post('api-keys')
   @UseGuards(MasterKeyGuard)

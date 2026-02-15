@@ -1,17 +1,33 @@
 import * as crypto from 'node:crypto';
 import { DEFAULT_MARGIN_USED, DEFAULT_STARTING_BALANCE } from '@algoarena/shared';
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { eq } from 'drizzle-orm';
+import { Resend } from 'resend';
+import { EnvConfig } from '../../config/env.validation';
 import { DrizzleProvider } from '../database/drizzle.provider';
 import { apiKeys, borrows, cuidUsers, positions } from '../database/schema';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { CreateCuidUserDto } from './dto/create-cuid-user.dto';
+import { RequestKeyDto } from './dto/request-key.dto';
 import { ResetAccountDto } from './dto/reset-account.dto';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly drizzle: DrizzleProvider) {}
+  private readonly resend: Resend | null;
+  private readonly fromEmail: string | undefined;
+  private readonly ownerEmail: string | undefined;
+
+  constructor(
+    private readonly drizzle: DrizzleProvider,
+    private readonly config: ConfigService<EnvConfig>,
+  ) {
+    const resendApiKey = this.config.get('RESEND_API_KEY', { infer: true });
+    this.resend = resendApiKey ? new Resend(resendApiKey) : null;
+    this.fromEmail = this.config.get('RESEND_FROM_EMAIL', { infer: true });
+    this.ownerEmail = this.config.get('OWNER_EMAIL', { infer: true });
+  }
 
   async generateApiKey(dto: CreateApiKeyDto) {
     const rawKey = crypto.randomBytes(32).toString('hex');
@@ -113,6 +129,24 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  async requestKey(dto: RequestKeyDto) {
+    if (!this.resend || !this.fromEmail || !this.ownerEmail) {
+      throw new ServiceUnavailableException('Email notifications are not configured');
+    }
+
+    await this.resend.emails.send({
+      from: this.fromEmail,
+      to: this.ownerEmail,
+      subject: `AlgoArena API Key Request from ${dto.name}`,
+      html: [
+        '<h2>New API Key Request</h2>',
+        `<p><strong>Name:</strong> ${dto.name}</p>`,
+        `<p><strong>Email:</strong> ${dto.email}</p>`,
+        `<p><strong>Submitted:</strong> ${new Date().toISOString()}</p>`,
+      ].join('\n'),
+    });
   }
 
   private generateCuid(): string {

@@ -17,6 +17,11 @@ export const envSchema = z.object({
 
   // Master key for admin operations
   MASTER_KEY: z.string().min(1).optional(),
+
+  // Resend (email notifications)
+  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_FROM_EMAIL: z.string().email().optional(),
+  OWNER_EMAIL: z.string().email().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

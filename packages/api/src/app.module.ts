@@ -26,6 +26,7 @@ import { WebSocketModule } from './modules/websocket/websocket.module';
         { name: 'market', ttl: 60000, limit: 120 },
         { name: 'trading', ttl: 60000, limit: 30 },
         { name: 'portfolio', ttl: 60000, limit: 60 },
+        { name: 'auth', ttl: 900000, limit: 3 },
       ],
     }),
     DatabaseModule,
