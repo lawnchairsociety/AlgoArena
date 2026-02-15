@@ -79,12 +79,11 @@ function AgentGuidePage() {
 
         <Section title="Setup Flow">
           <p className="text-muted-foreground mb-2">Run these steps once to get credentials:</p>
-          <Code>{`# 1. Create an API key (requires master key)
-curl -X POST ${baseUrl}/api/v1/auth/api-keys \\
-  -H "x-master-key: YOUR_MASTER_KEY" \\
+          <Code>{`# 1. Request an API key (self-service, rate limited to 3 per 15 minutes)
+curl -X POST ${baseUrl}/api/v1/auth/request-key \\
   -H "Content-Type: application/json" \\
-  -d '{"label": "my-bot"}'
-# Response: { "id": "...", "key": "YOUR_API_KEY", "label": "my-bot" }
+  -d '{"name": "Jane Doe", "email": "jane@example.com"}'
+# Response: { "message": "Your request has been submitted. You will receive an email when your API key is ready." }
 
 # 2. Create a user (requires API key)
 curl -X POST ${baseUrl}/api/v1/auth/users \\
@@ -188,6 +187,10 @@ Headers: x-algoarena-api-key
 GET /api/v1/auth/users/:cuid
 Headers: x-algoarena-cuid
 
+# Revoke an API key (admin only)
+DELETE /api/v1/auth/api-keys/:id
+Headers: x-master-key
+
 # Reset account (wipes orders, positions, trades — fresh start)
 POST /api/v1/auth/users/:cuid/reset
 Headers: x-algoarena-api-key
@@ -244,8 +247,13 @@ heartbeat               — every 30 seconds`}</Code>
           </div>
         </Section>
 
+        <Section title="Stats">
+          <Code>{`# Trading activity over time (public, no auth required)
+GET /api/v1/stats/activity?days=30`}</Code>
+        </Section>
+
         <Section title="Rate Limits">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm mb-4">
             <thead>
               <tr className="border-b border-border text-left">
                 <th className="py-2 pr-4">Endpoint Group</th>
@@ -265,14 +273,16 @@ heartbeat               — every 30 seconds`}</Code>
                 <td className="py-2 pr-4">Trading</td>
                 <td className="py-2">30 requests / minute</td>
               </tr>
+              <tr className="border-b border-border">
+                <td className="py-2 pr-4">Key Requests</td>
+                <td className="py-2">3 requests / 15 minutes</td>
+              </tr>
             </tbody>
           </table>
           <p className="text-muted-foreground text-sm mt-2">
-            Rate limits are per CUID. Exceeding the limit returns HTTP 429.
+            Rate limits are per CUID (or per IP for unauthenticated endpoints). Exceeding the limit returns HTTP 429.
           </p>
-          <p className="text-muted-foreground text-sm mt-4 mb-2">
-            Every throttled response includes rate limit headers:
-          </p>
+          <p className="text-muted-foreground text-sm mt-4 mb-2">Every response includes rate limit headers:</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left">
@@ -292,6 +302,10 @@ heartbeat               — every 30 seconds`}</Code>
               <tr className="border-b border-border">
                 <td className="py-2 pr-4 font-mono text-xs">X-RateLimit-Reset</td>
                 <td className="py-2">Seconds until the window resets</td>
+              </tr>
+              <tr className="border-b border-border">
+                <td className="py-2 pr-4 font-mono text-xs">Retry-After</td>
+                <td className="py-2">Seconds until the block expires (only present on 429 responses)</td>
               </tr>
             </tbody>
           </table>

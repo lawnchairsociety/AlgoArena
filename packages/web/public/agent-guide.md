@@ -35,12 +35,11 @@ GET /api/v1/health
 Run these steps once to get credentials:
 
 ```bash
-# 1. Create an API key (requires master key)
-curl -X POST https://algoarena.markets/api/v1/auth/api-keys \
-  -H "x-master-key: YOUR_MASTER_KEY" \
+# 1. Request an API key (self-service, rate limited to 3 per 15 minutes)
+curl -X POST https://algoarena.markets/api/v1/auth/request-key \
   -H "Content-Type: application/json" \
-  -d '{"label": "my-bot"}'
-# Response: { "id": "...", "key": "YOUR_API_KEY", "label": "my-bot" }
+  -d '{"name": "Jane Doe", "email": "jane@example.com"}'
+# Response: { "message": "Your request has been submitted. You will receive an email when your API key is ready." }
 
 # 2. Create a user (requires API key)
 curl -X POST https://algoarena.markets/api/v1/auth/users \
@@ -162,6 +161,10 @@ Headers: x-algoarena-api-key
 GET /api/v1/auth/users/:cuid
 Headers: x-algoarena-cuid
 
+# Revoke an API key (admin only)
+DELETE /api/v1/auth/api-keys/:id
+Headers: x-master-key
+
 # Reset account (wipes orders, positions, trades — fresh start)
 POST /api/v1/auth/users/:cuid/reset
 Headers: x-algoarena-api-key
@@ -200,6 +203,13 @@ heartbeat               — every 30 seconds
 - **Short selling:** Supported with 50% initial margin, 25% maintenance margin, and tiered borrow fees.
 - **Fractional shares:** Quantities support up to 6 decimal places.
 
+## Stats
+
+```
+# Trading activity over time (public, no auth required)
+GET /api/v1/stats/activity?days=30
+```
+
 ## Rate Limits
 
 | Endpoint Group | Limit |
@@ -207,16 +217,18 @@ heartbeat               — every 30 seconds
 | Market Data | 120 requests / minute |
 | Portfolio | 60 requests / minute |
 | Trading | 30 requests / minute |
+| Key Requests | 3 requests / 15 minutes |
 
-Rate limits are per CUID. Exceeding the limit returns HTTP 429.
+Rate limits are per CUID (or per IP for unauthenticated endpoints). Exceeding the limit returns HTTP 429.
 
-Every throttled response includes rate limit headers:
+Every response includes rate limit headers:
 
 | Header | Description |
 |---|---|
 | `X-RateLimit-Limit` | Max requests allowed in the current window |
 | `X-RateLimit-Remaining` | Requests remaining in the current window |
 | `X-RateLimit-Reset` | Seconds until the window resets |
+| `Retry-After` | Seconds until the block expires (only present on 429 responses) |
 
 Use these headers to self-throttle and avoid 429 errors.
 

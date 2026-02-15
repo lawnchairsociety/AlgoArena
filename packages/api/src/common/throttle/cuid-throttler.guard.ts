@@ -33,7 +33,7 @@ export class CuidThrottlerGuard extends ThrottlerGuard {
     );
 
     if (isBlocked) {
-      res.header('Retry-After', timeToBlockExpire);
+      res.header('Retry-After', Math.ceil(timeToBlockExpire / 1000));
       await this.throwThrottlingException(context, {
         limit,
         ttl,

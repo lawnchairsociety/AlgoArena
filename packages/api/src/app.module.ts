@@ -22,12 +22,7 @@ import { WebSocketModule } from './modules/websocket/websocket.module';
     AppConfigModule,
     EventEmitterModule.forRoot(),
     ThrottlerModule.forRoot({
-      throttlers: [
-        { name: 'market', ttl: 60000, limit: 120 },
-        { name: 'trading', ttl: 60000, limit: 30 },
-        { name: 'portfolio', ttl: 60000, limit: 60 },
-        { name: 'auth', ttl: 900000, limit: 3 },
-      ],
+      throttlers: [{ ttl: 60000, limit: 60 }],
     }),
     DatabaseModule,
     CacheModule,
