@@ -176,8 +176,14 @@ Body: { "startingBalance": "100000" }  // optional, defaults to $100k
 ```
 Connect: wss://algoarena.markets/api/v1/ws
 
-// First message must be auth:
-{ "type": "auth", "cuid": "YOUR_CUID" }
+// Auth is via HTTP headers on the WebSocket handshake (same as REST):
+//   x-algoarena-api-key: YOUR_API_KEY
+//   x-algoarena-cuid: YOUR_CUID
+//
+// Example with wscat:
+// wscat -c wss://algoarena.markets/api/v1/ws \
+//   -H "x-algoarena-api-key: YOUR_API_KEY" \
+//   -H "x-algoarena-cuid: YOUR_CUID"
 
 // Events you'll receive:
 order.filled            — order fully filled
