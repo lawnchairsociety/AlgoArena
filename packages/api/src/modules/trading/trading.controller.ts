@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
-import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { CuidUser } from '../../common/decorators/cuid-user.decorator';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { CuidGuard } from '../../common/guards/cuid.guard';
@@ -11,8 +11,7 @@ import { TradingService } from './trading.service';
 
 @ApiTags('Trading')
 @Controller('trading')
-@SkipThrottle()
-@Throttle({ trading: { ttl: 60000, limit: 30 } })
+@Throttle({ default: { ttl: 60000, limit: 30 } })
 export class TradingController {
   constructor(private readonly tradingService: TradingService) {}
 

@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
-import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { CuidUser } from '../../common/decorators/cuid-user.decorator';
 import { CuidGuard } from '../../common/guards/cuid.guard';
 import { CuidUserRecord } from '../../common/interfaces/authenticated-request.interface';
@@ -11,8 +11,7 @@ import { PortfolioService } from './portfolio.service';
 @Controller('portfolio')
 @UseGuards(CuidGuard)
 @ApiSecurity('cuid')
-@SkipThrottle()
-@Throttle({ portfolio: { ttl: 60000, limit: 60 } })
+@Throttle({ default: { ttl: 60000, limit: 60 } })
 export class PortfolioController {
   constructor(private readonly portfolioService: PortfolioService) {}
 

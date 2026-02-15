@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
-import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { CuidGuard } from '../../common/guards/cuid.guard';
 import { MarketDataService } from './market-data.service';
 
@@ -8,8 +8,7 @@ import { MarketDataService } from './market-data.service';
 @Controller('market')
 @UseGuards(CuidGuard)
 @ApiSecurity('cuid')
-@SkipThrottle()
-@Throttle({ market: { ttl: 60000, limit: 120 } })
+@Throttle({ default: { ttl: 60000, limit: 120 } })
 export class MarketDataController {
   constructor(private readonly marketData: MarketDataService) {}
 

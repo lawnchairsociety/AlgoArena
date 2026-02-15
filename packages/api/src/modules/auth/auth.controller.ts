@@ -20,7 +20,8 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('request-key')
-  @Throttle({ auth: { ttl: 900000, limit: 3 } })
+  @SkipThrottle({ default: false })
+  @Throttle({ default: { ttl: 900000, limit: 3 } })
   @ApiOperation({ summary: 'Request an API key' })
   @ApiResponse({ status: 201, description: 'Request submitted' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
@@ -40,10 +41,10 @@ export class AuthController {
   }
 
   @Delete('api-keys/:id')
-  @UseGuards(ApiKeyGuard)
+  @UseGuards(MasterKeyGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke an API key' })
-  @ApiSecurity('api-key')
+  @ApiSecurity('master-key')
   @ApiParam({ name: 'id', description: 'API key ID' })
   @ApiResponse({ status: 204, description: 'API key revoked' })
   async revokeApiKey(@Param('id') id: string) {
