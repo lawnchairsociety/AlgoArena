@@ -31,6 +31,7 @@ async function bootstrap() {
       'http://localhost:5173', // Vite dev server
     ],
     allowedHeaders: ['Content-Type', 'x-algoarena-api-key', 'x-algoarena-cuid', 'x-master-key'],
+    exposedHeaders: ['Link'],
   });
 
   // Swagger / OpenAPI
@@ -50,8 +51,14 @@ async function bootstrap() {
     jsonDocumentUrl: `${API_PREFIX}/openapi.json`,
   });
 
-  // Serve Scalar API docs at /docs
+  // Link header for agent discoverability
   const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook('onSend', (_request: any, reply: any, payload: any, done: any) => {
+    reply.header('Link', '</agent-guide.md>; rel="help", </api/v1/openapi.json>; rel="service-desc"');
+    done(null, payload);
+  });
+
+  // Serve Scalar API docs at /docs
   const scalarHtml = `<!doctype html>
 <html>
 <head>

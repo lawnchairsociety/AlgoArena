@@ -4,9 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AlgoArena</title>
+    <meta name="description" content="Paper trading platform for testing algorithmic and AI trading strategies against real-time market data." />
     <link rel="icon" type="image/png" href="/algoarena.png" />
+    <link rel="help" href="/agent-guide.md" />
+    <link rel="describedby" href="/llms.txt" />
+    <link rel="service-desc" href="/api/v1/openapi.json" />
   </head>
   <body>
+    <noscript>
+      <h1>AlgoArena</h1>
+      <p>Paper trading platform for testing algorithmic and AI trading strategies against real-time market data.</p>
+      <ul>
+        <li><a href="/agent-guide.md">Agent Guide</a> — Complete API reference for AI agents and trading bots</li>
+        <li><a href="/llms.txt">llms.txt</a> — LLM discovery file</li>
+        <li><a href="/api/v1/openapi.json">OpenAPI Spec</a> — Full OpenAPI 3.0 specification</li>
+      </ul>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
