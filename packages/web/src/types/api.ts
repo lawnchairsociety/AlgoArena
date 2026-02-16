@@ -63,6 +63,10 @@ export interface Order {
   limitPrice: string | null;
   stopPrice: string | null;
   avgFillPrice: string | null;
+  trailPercent: string | null;
+  trailPrice: string | null;
+  highWaterMark: string | null;
+  trailingStopPrice: string | null;
   status: string;
   rejectionReason: string | null;
   createdAt: string;

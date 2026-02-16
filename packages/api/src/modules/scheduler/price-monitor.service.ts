@@ -5,6 +5,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { DrizzleProvider } from '../database/drizzle.provider';
 import { orders } from '../database/schema';
 import { MarketDataService } from '../market-data/market-data.service';
+import { Quote } from '../market-data/types/market-data-provider.types';
 import { OrderEngineService } from '../trading/order-engine.service';
 
 @Injectable()
@@ -24,7 +25,7 @@ export class PriceMonitorService {
       .where(
         and(
           inArray(orders.status, ['pending', 'partially_filled']),
-          inArray(orders.type, ['limit', 'stop', 'stop_limit']),
+          inArray(orders.type, ['limit', 'stop', 'stop_limit', 'trailing_stop']),
         ),
       );
 
@@ -48,6 +49,12 @@ export class PriceMonitorService {
       try {
         const quote = quotes[order.symbol];
         if (!quote) continue;
+
+        if (order.type === 'trailing_stop') {
+          await this.evaluateTrailingStop(order, quote);
+          evaluated++;
+          continue;
+        }
 
         const fillPrice = this.orderEngine.evaluateOrderConditions(
           order.type as OrderType,
@@ -129,6 +136,51 @@ export class PriceMonitorService {
     }
 
     this.logger.log(`Market open: filled ${filled}/${marketOrders.length} queued market orders`);
+  }
+
+  private async evaluateTrailingStop(order: typeof orders.$inferSelect, quote: Quote): Promise<void> {
+    const currentBid = new Decimal(quote.bidPrice);
+    const hwm = new Decimal(order.highWaterMark!);
+    const trailingStop = new Decimal(order.trailingStopPrice!);
+
+    // Update high-water mark if price moved up
+    if (currentBid.gt(hwm)) {
+      let newStopPrice: Decimal;
+      if (order.trailPercent) {
+        newStopPrice = currentBid.mul(new Decimal(1).minus(new Decimal(order.trailPercent).div(100)));
+      } else {
+        newStopPrice = currentBid.minus(new Decimal(order.trailPrice!));
+      }
+
+      await this.drizzle.db
+        .update(orders)
+        .set({
+          highWaterMark: currentBid.toFixed(4),
+          trailingStopPrice: newStopPrice.toFixed(4),
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, order.id));
+
+      this.logger.log(
+        `Trailing stop ${order.id}: HWM updated ${hwm.toFixed(4)} → ${currentBid.toFixed(4)}, stop ${trailingStop.toFixed(4)} → ${newStopPrice.toFixed(4)}`,
+      );
+      return; // Don't trigger on the same tick as an HWM update
+    }
+
+    // Check if stop triggered
+    if (currentBid.lte(trailingStop)) {
+      const fillQuantity = new Decimal(order.quantity).minus(new Decimal(order.filledQuantity));
+
+      await this.orderEngine.executeFill({
+        orderId: order.id,
+        fillPrice: currentBid,
+        fillQuantity,
+      });
+
+      this.logger.log(
+        `Trailing stop ${order.id} triggered: ${order.symbol} @ ${currentBid.toFixed(4)} (HWM: ${hwm.toFixed(4)}, stop: ${trailingStop.toFixed(4)})`,
+      );
+    }
   }
 
   private async rejectOrder(orderId: string, reason: string): Promise<void> {

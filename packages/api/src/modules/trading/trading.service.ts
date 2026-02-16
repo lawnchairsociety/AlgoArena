@@ -81,6 +81,10 @@ export class TradingService {
     const isCover = dto.side === 'buy' && currentPositionQty.lt(0);
 
     // 6. Short sell checks
+    if (dto.type === 'trailing_stop' && isShortSell) {
+      throw new BadRequestException('Trailing stop orders require an existing long position');
+    }
+
     if (isShortSell) {
       if (isCrypto) {
         throw new BadRequestException('Short selling is not supported for crypto');
@@ -173,8 +177,29 @@ export class TradingService {
         quantity: dto.quantity,
         limitPrice: dto.limitPrice ?? null,
         stopPrice: dto.stopPrice ?? null,
+        trailPercent: dto.trailPercent ?? null,
+        trailPrice: dto.trailPrice ?? null,
       })
       .returning();
+
+    // 9b. Compute HWM for trailing stops
+    if (dto.type === 'trailing_stop') {
+      const bidPrice = new Decimal(quote.bidPrice);
+      const hwm = bidPrice;
+      let stopPriceCalc: Decimal;
+      if (dto.trailPercent) {
+        stopPriceCalc = hwm.mul(new Decimal(1).minus(new Decimal(dto.trailPercent).div(100)));
+      } else {
+        stopPriceCalc = hwm.minus(new Decimal(dto.trailPrice!));
+      }
+      await this.drizzle.db
+        .update(orders)
+        .set({
+          highWaterMark: hwm.toFixed(4),
+          trailingStopPrice: stopPriceCalc.toFixed(4),
+        })
+        .where(eq(orders.id, order.id));
+    }
 
     // 10. Immediate fill logic
     try {
@@ -386,6 +411,44 @@ export class TradingService {
       if (dto.stopPrice) {
         throw new BadRequestException('stopPrice must not be set for market orders');
       }
+    }
+
+    if (dto.type === 'trailing_stop') {
+      if (dto.side !== 'sell') {
+        throw new BadRequestException('Trailing stop orders must be sell-side');
+      }
+      if (dto.limitPrice) {
+        throw new BadRequestException('limitPrice must not be set for trailing_stop orders');
+      }
+      if (dto.stopPrice) {
+        throw new BadRequestException('stopPrice must not be set for trailing_stop orders');
+      }
+      if (!dto.trailPercent && !dto.trailPrice) {
+        throw new BadRequestException('trailing_stop requires either trailPercent or trailPrice');
+      }
+      if (dto.trailPercent && dto.trailPrice) {
+        throw new BadRequestException('Set only one of trailPercent or trailPrice, not both');
+      }
+      if (dto.trailPercent) {
+        const tp = new Decimal(dto.trailPercent);
+        if (tp.lte(0) || tp.gt(50)) {
+          throw new BadRequestException('trailPercent must be > 0 and <= 50');
+        }
+      }
+      if (dto.trailPrice) {
+        const tp = new Decimal(dto.trailPrice);
+        if (tp.lte(0)) {
+          throw new BadRequestException('trailPrice must be > 0');
+        }
+      }
+      if (dto.timeInForce !== 'day' && dto.timeInForce !== 'gtc') {
+        throw new BadRequestException('Trailing stop orders only support day or gtc time-in-force');
+      }
+    }
+
+    if (dto.type !== 'trailing_stop') {
+      if (dto.trailPercent) throw new BadRequestException('trailPercent is only valid for trailing_stop orders');
+      if (dto.trailPrice) throw new BadRequestException('trailPrice is only valid for trailing_stop orders');
     }
 
     if (dto.limitPrice) {

@@ -161,6 +161,10 @@ export class OrderEngineService {
         avgFillPrice: newAvgFillPrice.toFixed(4),
         fillPrice: fillPrice.toFixed(4),
         fillQuantity: fillQuantity.toFixed(6),
+        highWaterMark: order.highWaterMark ?? null,
+        trailingStopPrice: order.trailingStopPrice ?? null,
+        trailPercent: order.trailPercent ?? null,
+        trailPrice: order.trailPrice ?? null,
       };
 
       // 7. Update cash balance
