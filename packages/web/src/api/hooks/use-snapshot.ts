@@ -14,7 +14,7 @@ export function useSnapshot(symbol: string | null) {
   return useQuery({
     queryKey: ['snapshot', symbol],
     queryFn: async () => {
-      const { data } = await apiClient.get<Snapshot>(`/market/snapshots/${symbol}`);
+      const { data } = await apiClient.get<Snapshot>(`/market/snapshots/${encodeURIComponent(symbol!)}`);
       return data;
     },
     enabled: !!symbol,

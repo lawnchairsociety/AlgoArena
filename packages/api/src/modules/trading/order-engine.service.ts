@@ -2,6 +2,7 @@ import {
   BORROW_RATE_EASY,
   BORROW_RATE_MODERATE,
   INITIAL_MARGIN_REQUIREMENT,
+  isCryptoSymbol,
   OrderSide,
   OrderType,
 } from '@algoarena/shared';
@@ -194,17 +195,19 @@ export class OrderEngineService {
         existingPosition,
       );
 
-      // 9. Handle borrows (short open/close)
-      const newMarginUsed = await this.handleBorrows(
-        tx,
-        order.cuidUserId,
-        order.symbol.toUpperCase(),
-        order.side,
-        fillQuantity,
-        fillPrice,
-        currentPositionQty,
-        marginUsed,
-      );
+      // 9. Handle borrows (short open/close — equities only)
+      const newMarginUsed = isCryptoSymbol(order.symbol)
+        ? marginUsed
+        : await this.handleBorrows(
+            tx,
+            order.cuidUserId,
+            order.symbol.toUpperCase(),
+            order.side,
+            fillQuantity,
+            fillPrice,
+            currentPositionQty,
+            marginUsed,
+          );
 
       // Write back cash + margin
       await tx
@@ -215,16 +218,18 @@ export class OrderEngineService {
         })
         .where(eq(cuidUsers.id, order.cuidUserId));
 
-      // 10. Record day trade if applicable
-      pdtCount = await this.pdtService.recordDayTradeIfApplicable(
-        tx,
-        order.cuidUserId,
-        order.symbol.toUpperCase(),
-        orderId,
-        order.side,
-        fillPrice.toFixed(4),
-        fillQuantity.toFixed(6),
-      );
+      // 10. Record day trade if applicable (equities only)
+      if (!isCryptoSymbol(order.symbol)) {
+        pdtCount = await this.pdtService.recordDayTradeIfApplicable(
+          tx,
+          order.cuidUserId,
+          order.symbol.toUpperCase(),
+          orderId,
+          order.side,
+          fillPrice.toFixed(4),
+          fillQuantity.toFixed(6),
+        );
+      }
     });
 
     // Emit events after transaction commits
@@ -389,6 +394,7 @@ export class OrderEngineService {
         id: positionId,
         cuidUserId,
         symbol,
+        assetClass: isCryptoSymbol(symbol) ? 'crypto' : 'us_equity',
         quantity: newQty.toFixed(6),
         avgCostBasis: newAvgCostBasis?.toFixed(4),
         totalCostBasis: newTotalCostBasis?.toFixed(2),

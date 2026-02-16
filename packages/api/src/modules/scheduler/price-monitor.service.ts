@@ -1,4 +1,4 @@
-import { OrderSide, OrderType } from '@algoarena/shared';
+import { isCryptoSymbol, OrderSide, OrderType } from '@algoarena/shared';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -17,7 +17,7 @@ export class PriceMonitorService {
     private readonly orderEngine: OrderEngineService,
   ) {}
 
-  async evaluatePendingOrders(): Promise<void> {
+  async evaluatePendingOrders(marketIsOpen = true): Promise<void> {
     const pendingOrders = await this.drizzle.db
       .select()
       .from(orders)
@@ -30,13 +30,21 @@ export class PriceMonitorService {
 
     if (pendingOrders.length === 0) return;
 
-    const symbols = [...new Set(pendingOrders.map((o) => o.symbol))];
+    // Filter: always evaluate crypto, equity only when market is open
+    const ordersToEvaluate = pendingOrders.filter((o) => {
+      if (isCryptoSymbol(o.symbol)) return true;
+      return marketIsOpen;
+    });
+
+    if (ordersToEvaluate.length === 0) return;
+
+    const symbols = [...new Set(ordersToEvaluate.map((o) => o.symbol))];
     const quotes = await this.marketDataService.getQuotes(symbols);
 
     let evaluated = 0;
     let filled = 0;
 
-    for (const order of pendingOrders) {
+    for (const order of ordersToEvaluate) {
       try {
         const quote = quotes[order.symbol];
         if (!quote) continue;

@@ -1,4 +1,4 @@
-import { ALPACA_DATA_BASE_URL } from '@algoarena/shared';
+import { ALPACA_DATA_BASE_URL, isCryptoSymbol, normalizeCryptoSymbol } from '@algoarena/shared';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MarketDataProvider } from './market-data.provider';
@@ -8,6 +8,9 @@ import {
   AlpacaBarsResponse,
   AlpacaCalendarDay,
   AlpacaClock,
+  AlpacaCryptoBarsResponse,
+  AlpacaCryptoQuoteResponse,
+  AlpacaCryptoSnapshotResponse,
   AlpacaMultiBarsResponse,
   AlpacaMultiQuoteResponse,
   AlpacaQuote,
@@ -45,18 +48,51 @@ export class AlpacaClientService extends MarketDataProvider {
   // ── MarketDataProvider Implementation ──
 
   async getLatestQuote(symbol: string): Promise<Quote> {
+    if (isCryptoSymbol(symbol)) {
+      const normalized = normalizeCryptoSymbol(symbol);
+      const res = await this.cryptoDataRequest<AlpacaCryptoQuoteResponse>('/v1beta3/crypto/us/latest/quotes', {
+        symbols: normalized,
+      });
+      const quote = res.quotes[normalized];
+      if (!quote) throw new HttpException(`No crypto quote for ${normalized}`, HttpStatus.NOT_FOUND);
+      return this.mapQuote(quote);
+    }
+
     const res = await this.dataRequest<AlpacaQuoteResponse>(`/v2/stocks/${encodeURIComponent(symbol)}/quotes/latest`);
     return this.mapQuote(res.quote);
   }
 
   async getLatestQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-    const res = await this.dataRequest<AlpacaMultiQuoteResponse>('/v2/stocks/quotes/latest', {
-      symbols: symbols.join(','),
-    });
+    const { crypto, equity } = this.partitionSymbols(symbols);
     const result: Record<string, Quote> = {};
-    for (const [sym, quote] of Object.entries(res.quotes)) {
-      result[sym] = this.mapQuote(quote);
+
+    const promises: Promise<void>[] = [];
+
+    if (equity.length > 0) {
+      promises.push(
+        this.dataRequest<AlpacaMultiQuoteResponse>('/v2/stocks/quotes/latest', {
+          symbols: equity.join(','),
+        }).then((res) => {
+          for (const [sym, quote] of Object.entries(res.quotes)) {
+            result[sym] = this.mapQuote(quote);
+          }
+        }),
+      );
     }
+
+    if (crypto.length > 0) {
+      promises.push(
+        this.cryptoDataRequest<AlpacaCryptoQuoteResponse>('/v1beta3/crypto/us/latest/quotes', {
+          symbols: crypto.join(','),
+        }).then((res) => {
+          for (const [sym, quote] of Object.entries(res.quotes)) {
+            result[sym] = this.mapQuote(quote);
+          }
+        }),
+      );
+    }
+
+    await Promise.all(promises);
     return result;
   }
 
@@ -64,6 +100,20 @@ export class AlpacaClientService extends MarketDataProvider {
     symbol: string,
     params: { timeframe: string; start?: string; end?: string; limit?: number },
   ): Promise<BarsResponse> {
+    if (isCryptoSymbol(symbol)) {
+      const normalized = normalizeCryptoSymbol(symbol);
+      const res = await this.cryptoDataRequest<AlpacaCryptoBarsResponse>('/v1beta3/crypto/us/bars', {
+        symbols: normalized,
+        ...(params as Record<string, string | number>),
+      });
+      const bars = res.bars[normalized] || [];
+      return {
+        bars: bars.map((b) => this.mapBar(b)),
+        symbol: normalized,
+        nextPageToken: res.next_page_token,
+      };
+    }
+
     const res = await this.dataRequest<AlpacaBarsResponse>(
       `/v2/stocks/${encodeURIComponent(symbol)}/bars`,
       params as Record<string, string | number>,
@@ -79,18 +129,64 @@ export class AlpacaClientService extends MarketDataProvider {
     symbols: string[],
     params: { timeframe: string; start?: string; end?: string; limit?: number },
   ): Promise<MultiBarsResponse> {
-    const res = await this.dataRequest<AlpacaMultiBarsResponse>('/v2/stocks/bars', {
-      symbols: symbols.join(','),
-      ...(params as Record<string, string | number>),
-    });
+    const { crypto, equity } = this.partitionSymbols(symbols);
     const bars: Record<string, Bar[]> = {};
-    for (const [sym, alpacaBars] of Object.entries(res.bars || {})) {
-      bars[sym] = alpacaBars.map((b) => this.mapBar(b));
+    let nextPageToken: string | null = null;
+
+    const promises: Promise<void>[] = [];
+
+    if (equity.length > 0) {
+      promises.push(
+        this.dataRequest<AlpacaMultiBarsResponse>('/v2/stocks/bars', {
+          symbols: equity.join(','),
+          ...(params as Record<string, string | number>),
+        }).then((res) => {
+          for (const [sym, alpacaBars] of Object.entries(res.bars || {})) {
+            bars[sym] = alpacaBars.map((b) => this.mapBar(b));
+          }
+          if (res.next_page_token) nextPageToken = res.next_page_token;
+        }),
+      );
     }
-    return { bars, nextPageToken: res.next_page_token };
+
+    if (crypto.length > 0) {
+      promises.push(
+        this.cryptoDataRequest<AlpacaCryptoBarsResponse>('/v1beta3/crypto/us/bars', {
+          symbols: crypto.join(','),
+          ...(params as Record<string, string | number>),
+        }).then((res) => {
+          for (const [sym, alpacaBars] of Object.entries(res.bars || {})) {
+            bars[sym] = alpacaBars.map((b) => this.mapBar(b));
+          }
+        }),
+      );
+    }
+
+    await Promise.all(promises);
+    return { bars, nextPageToken };
   }
 
   async getSnapshot(symbol: string): Promise<Snapshot> {
+    if (isCryptoSymbol(symbol)) {
+      const normalized = normalizeCryptoSymbol(symbol);
+      const res = await this.cryptoDataRequest<AlpacaCryptoSnapshotResponse>('/v1beta3/crypto/us/snapshots', {
+        symbols: normalized,
+      });
+      const snap = res.snapshots[normalized];
+      if (!snap) throw new HttpException(`No crypto snapshot for ${normalized}`, HttpStatus.NOT_FOUND);
+      return {
+        latestTrade: {
+          timestamp: snap.latestTrade.t,
+          price: snap.latestTrade.p,
+          size: snap.latestTrade.s,
+        },
+        latestQuote: this.mapQuote(snap.latestQuote),
+        minuteBar: this.mapBar(snap.minuteBar),
+        dailyBar: this.mapBar(snap.dailyBar),
+        prevDailyBar: this.mapBar(snap.prevDailyBar),
+      };
+    }
+
     const res = await this.dataRequest<AlpacaSnapshot>(`/v2/stocks/${encodeURIComponent(symbol)}/snapshot`);
     return {
       latestTrade: {
@@ -121,7 +217,8 @@ export class AlpacaClientService extends MarketDataProvider {
   }
 
   async getAsset(symbol: string): Promise<Asset> {
-    const res = await this.tradingRequest<AlpacaAsset>(`/v2/assets/${encodeURIComponent(symbol)}`);
+    const normalized = isCryptoSymbol(symbol) ? normalizeCryptoSymbol(symbol) : symbol;
+    const res = await this.tradingRequest<AlpacaAsset>(`/v2/assets/${encodeURIComponent(normalized)}`);
     return this.mapAsset(res);
   }
 
@@ -175,10 +272,32 @@ export class AlpacaClientService extends MarketDataProvider {
       easyToBorrow: a.easy_to_borrow,
       fractionable: a.fractionable,
       maintenanceMarginRequirement: a.maintenance_margin_requirement,
+      minOrderSize: a.min_order_size,
+      minTradeIncrement: a.min_trade_increment,
+      priceIncrement: a.price_increment,
     };
   }
 
+  // ── Private Helpers ──
+
+  private partitionSymbols(symbols: string[]): { crypto: string[]; equity: string[] } {
+    const crypto: string[] = [];
+    const equity: string[] = [];
+    for (const s of symbols) {
+      if (isCryptoSymbol(s)) {
+        crypto.push(normalizeCryptoSymbol(s));
+      } else {
+        equity.push(s);
+      }
+    }
+    return { crypto, equity };
+  }
+
   // ── Private HTTP Helpers ──
+
+  private async cryptoDataRequest<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+    return this.request<T>(ALPACA_DATA_BASE_URL, path, params);
+  }
 
   private async dataRequest<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
     return this.request<T>(ALPACA_DATA_BASE_URL, path, { ...params, feed: 'sip' });

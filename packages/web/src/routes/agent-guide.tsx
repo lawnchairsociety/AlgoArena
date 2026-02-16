@@ -126,6 +126,63 @@ Statuses: pending | filled | partially_filled | cancelled | expired | rejected`}
 Headers: x-algoarena-cuid`}</Code>
         </Section>
 
+        <Section title="Crypto Trading">
+          <p className="text-muted-foreground mb-3">
+            AlgoArena supports cryptocurrency trading alongside equities via the same API. Crypto markets are always
+            open (24/7).
+          </p>
+
+          <h3 className="font-semibold mb-2">Symbol Format</h3>
+          <p className="text-muted-foreground mb-3">
+            Use slash notation (<code>BTC/USD</code>) or compact notation (<code>BTCUSD</code>) — both are accepted.
+            URL-encode the slash in path parameters: <code>/market/quotes/BTC%2FUSD</code>.
+          </p>
+
+          <h3 className="font-semibold mb-2">Supported Order Types & TIF</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>
+              <strong>Order types:</strong> market, limit, stop_limit (NOT stop)
+            </p>
+            <p>
+              <strong>Time in force:</strong> gtc, ioc (NOT day, fok)
+            </p>
+          </div>
+
+          <h3 className="font-semibold mb-2">Key Differences from Equities</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>Always open — crypto orders fill and evaluate 24/7</p>
+            <p>No short selling — sell side is long-close only</p>
+            <p>No PDT rules — pattern day trader restrictions do not apply</p>
+            <p>No margin — crypto positions are not marginable</p>
+          </div>
+
+          <h3 className="font-semibold mb-2">Crypto Market Data</h3>
+          <Code>{`# Crypto clock (always returns isOpen: true)
+GET /api/v1/market/clock?class=crypto
+
+# List crypto assets
+GET /api/v1/market/assets?asset_class=crypto
+
+# Crypto quote (URL-encode the slash)
+GET /api/v1/market/quotes/BTC%2FUSD
+
+# Mixed quotes (equity + crypto)
+GET /api/v1/market/quotes?symbols=AAPL,BTC/USD`}</Code>
+
+          <h3 className="font-semibold mb-2">Example: Buy Crypto</h3>
+          <Code>{`POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "BTC/USD",
+  "side": "buy",
+  "type": "market",
+  "quantity": "0.01",
+  "timeInForce": "gtc"
+}`}</Code>
+        </Section>
+
         <Section title="Portfolio">
           <Code>{`# Account summary (cash, equity, P&L, PDT status)
 GET /api/v1/portfolio/account

@@ -8,6 +8,7 @@ export const orders = pgTable('orders', {
     .notNull()
     .references(() => cuidUsers.id),
   symbol: text('symbol').notNull(),
+  assetClass: text('asset_class').notNull().default('us_equity'),
   side: orderSideEnum('side').notNull(),
   type: orderTypeEnum('type').notNull(),
   timeInForce: timeInForceEnum('time_in_force').notNull(),

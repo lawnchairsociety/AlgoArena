@@ -6,7 +6,7 @@ export function useBars(symbol: string | null, timeframe = '1Day', limit = 100) 
   return useQuery({
     queryKey: ['bars', symbol, timeframe, limit],
     queryFn: async () => {
-      const { data } = await apiClient.get<BarsResponse>(`/market/bars/${symbol}`, {
+      const { data } = await apiClient.get<BarsResponse>(`/market/bars/${encodeURIComponent(symbol!)}`, {
         params: { timeframe, limit },
       });
       return data;

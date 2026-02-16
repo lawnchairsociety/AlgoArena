@@ -53,6 +53,12 @@ export const ALPACA_DATA_BASE_URL = 'https://data.alpaca.markets';
 
 export const API_PREFIX = 'api/v1';
 
+// ── Crypto ──
+
+export const CRYPTO_ASSET_CLASS = 'crypto';
+export const CRYPTO_ALLOWED_ORDER_TYPES = ['market', 'limit', 'stop_limit'] as const;
+export const CRYPTO_ALLOWED_TIF = ['gtc', 'ioc'] as const;
+
 // ── WebSocket ──
 
 export const WS_HEARTBEAT_INTERVAL_MS = 30_000;
