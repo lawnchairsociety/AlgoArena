@@ -27,6 +27,7 @@ export interface Position {
   id: string;
   cuidUserId: string;
   symbol: string;
+  assetClass?: string;
   quantity: string;
   avgCostBasis: string;
   totalCostBasis: string;
@@ -53,6 +54,7 @@ export interface Order {
   id: string;
   cuidUserId: string;
   symbol: string;
+  assetClass?: string;
   side: string;
   type: string;
   timeInForce: string;
@@ -145,6 +147,9 @@ export interface Asset {
   shortable: boolean;
   easyToBorrow: boolean;
   fractionable: boolean;
+  minOrderSize?: string;
+  minTradeIncrement?: string;
+  priceIncrement?: string;
 }
 
 export interface ActivityDay {

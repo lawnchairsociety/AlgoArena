@@ -1,4 +1,4 @@
-import { PDT_MIN_EQUITY } from '@algoarena/shared';
+import { isCryptoSymbol, normalizeCryptoSymbol, PDT_MIN_EQUITY } from '@algoarena/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { and, desc, eq, gte } from 'drizzle-orm';
@@ -107,11 +107,12 @@ export class PortfolioService {
   }
 
   async getPositionBySymbol(userId: string, symbol: string) {
-    const positionId = `${userId}:${symbol.toUpperCase()}`;
+    const sym = isCryptoSymbol(symbol) ? normalizeCryptoSymbol(symbol) : symbol.toUpperCase();
+    const positionId = `${userId}:${sym}`;
     const [pos] = await this.drizzle.db.select().from(positions).where(eq(positions.id, positionId)).limit(1);
 
     if (!pos) {
-      throw new NotFoundException(`No position found for ${symbol.toUpperCase()}`);
+      throw new NotFoundException(`No position found for ${sym}`);
     }
 
     const quote = await this.marketDataService.getQuote(pos.symbol);

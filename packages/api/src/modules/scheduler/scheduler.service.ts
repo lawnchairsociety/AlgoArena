@@ -38,9 +38,8 @@ export class SchedulerService {
     try {
       this.lock('priceMonitor');
       const clock = await this.marketDataService.getClock();
-      if (!clock.isOpen) return;
-
-      await this.priceMonitor.evaluatePendingOrders();
+      // Always run — crypto orders need evaluation even when equity market is closed
+      await this.priceMonitor.evaluatePendingOrders(clock.isOpen);
     } catch (error) {
       this.logger.error(`Price monitor error: ${error instanceof Error ? error.message : error}`);
     } finally {
@@ -86,7 +85,13 @@ export class SchedulerService {
           expiredAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(and(inArray(orders.status, ['pending', 'partially_filled']), eq(orders.timeInForce, 'day')))
+        .where(
+          and(
+            inArray(orders.status, ['pending', 'partially_filled']),
+            eq(orders.timeInForce, 'day'),
+            eq(orders.assetClass, 'us_equity'),
+          ),
+        )
         .returning({
           id: orders.id,
           cuidUserId: orders.cuidUserId,

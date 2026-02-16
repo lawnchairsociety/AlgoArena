@@ -1,3 +1,8 @@
+// ── Asset classes ──
+
+export const ASSET_CLASSES = ['us_equity', 'crypto'] as const;
+export type AssetClass = (typeof ASSET_CLASSES)[number];
+
 // ── Enum value arrays (single source of truth for TS types + Drizzle pgEnums) ──
 
 export const ORDER_SIDES = ['buy', 'sell'] as const;

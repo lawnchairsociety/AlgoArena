@@ -1,4 +1,10 @@
-import { INITIAL_MARGIN_REQUIREMENT } from '@algoarena/shared';
+import {
+  CRYPTO_ALLOWED_ORDER_TYPES,
+  CRYPTO_ALLOWED_TIF,
+  INITIAL_MARGIN_REQUIREMENT,
+  isCryptoSymbol,
+  normalizeCryptoSymbol,
+} from '@algoarena/shared';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import Decimal from 'decimal.js';
@@ -30,10 +36,17 @@ export class TradingService {
   // ── Public Methods ──
 
   async placeOrder(cuidUserId: string, dto: PlaceOrderDto) {
+    // 0. Crypto detection + normalization
+    const isCrypto = isCryptoSymbol(dto.symbol);
+    if (isCrypto) dto.symbol = normalizeCryptoSymbol(dto.symbol);
+
     // 1. Validate DTO
     this.validateOrderDto(dto);
 
-    // 2. Validate symbol
+    // 2. Crypto-specific constraints
+    if (isCrypto) this.validateCryptoConstraints(dto);
+
+    // 3. Validate symbol
     const asset = await this.marketDataProvider.getAsset(dto.symbol);
     if (!asset.tradable) {
       throw new BadRequestException(`${dto.symbol} is not tradable`);
@@ -52,7 +65,8 @@ export class TradingService {
       throw new NotFoundException('User not found');
     }
 
-    const positionId = `${cuidUserId}:${dto.symbol.toUpperCase()}`;
+    const normalizedSymbol = isCrypto ? dto.symbol : dto.symbol.toUpperCase();
+    const positionId = `${cuidUserId}:${normalizedSymbol}`;
     const [existingPosition] = await this.drizzle.db
       .select()
       .from(positions)
@@ -68,6 +82,10 @@ export class TradingService {
 
     // 6. Short sell checks
     if (isShortSell) {
+      if (isCrypto) {
+        throw new BadRequestException('Short selling is not supported for crypto');
+      }
+
       if (!asset.shortable) {
         throw new BadRequestException(`${dto.symbol} is not shortable`);
       }
@@ -103,8 +121,8 @@ export class TradingService {
       }
     }
 
-    // 7. PDT check
-    if (user.pdtEnforced) {
+    // 7. PDT check (equities only)
+    if (user.pdtEnforced && !isCrypto) {
       const equity = await this.computeEquity(user);
       const pdtError = await this.pdtService.checkPdtRule(cuidUserId, equity);
       if (pdtError) {
@@ -147,7 +165,8 @@ export class TradingService {
       .insert(orders)
       .values({
         cuidUserId,
-        symbol: dto.symbol.toUpperCase(),
+        symbol: normalizedSymbol,
+        assetClass: isCrypto ? 'crypto' : 'us_equity',
         side: dto.side,
         type: dto.type,
         timeInForce: dto.timeInForce,
@@ -160,7 +179,7 @@ export class TradingService {
     // 10. Immediate fill logic
     try {
       if (dto.type === 'market') {
-        if (clock.isOpen) {
+        if (clock.isOpen || isCrypto) {
           const fillPrice = this.orderEngine.getMarketFillPrice(dto.side, quote);
           await this.orderEngine.executeFill({
             orderId: order.id,
@@ -174,7 +193,7 @@ export class TradingService {
         }
         // else: day/gtc market order stays pending until market opens
       } else if (dto.timeInForce === 'ioc' || dto.timeInForce === 'fok') {
-        if (!clock.isOpen) {
+        if (!clock.isOpen && !isCrypto) {
           await this.rejectOrder(order.id, 'Market is closed');
           this.emitOrderRejected(order, cuidUserId, 'Market is closed');
         } else {
@@ -331,6 +350,19 @@ export class TradingService {
     }
 
     return cash.plus(positionsValue);
+  }
+
+  private validateCryptoConstraints(dto: PlaceOrderDto): void {
+    if (!(CRYPTO_ALLOWED_ORDER_TYPES as readonly string[]).includes(dto.type)) {
+      throw new BadRequestException(
+        `Order type '${dto.type}' is not supported for crypto. Allowed: ${CRYPTO_ALLOWED_ORDER_TYPES.join(', ')}`,
+      );
+    }
+    if (!(CRYPTO_ALLOWED_TIF as readonly string[]).includes(dto.timeInForce)) {
+      throw new BadRequestException(
+        `Time in force '${dto.timeInForce}' is not supported for crypto. Allowed: ${CRYPTO_ALLOWED_TIF.join(', ')}`,
+      );
+    }
   }
 
   private validateOrderDto(dto: PlaceOrderDto): void {

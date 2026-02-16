@@ -117,8 +117,12 @@ export class MarketDataController {
 
   @Get('clock')
   @ApiOperation({ summary: 'Get current market clock' })
+  @ApiQuery({ name: 'class', description: 'Asset class (us_equity or crypto)', required: false })
   @ApiResponse({ status: 200, description: 'Market clock returned' })
-  async getClock() {
+  async getClock(@Query('class') assetClass?: string) {
+    if (assetClass === 'crypto') {
+      return { timestamp: new Date().toISOString(), isOpen: true, nextOpen: null, nextClose: null };
+    }
     return this.marketData.getClock();
   }
 

@@ -91,6 +91,24 @@ export interface AlpacaAsset {
   fractionable: boolean;
   maintenance_margin_requirement?: number;
   attributes?: string[];
+  min_order_size?: string;
+  min_trade_increment?: string;
+  price_increment?: string;
+}
+
+// ── Crypto Responses ──
+
+export interface AlpacaCryptoQuoteResponse {
+  quotes: Record<string, AlpacaQuote>;
+}
+
+export interface AlpacaCryptoBarsResponse {
+  bars: Record<string, AlpacaBar[]>;
+  next_page_token: string | null;
+}
+
+export interface AlpacaCryptoSnapshotResponse {
+  snapshots: Record<string, AlpacaSnapshot>;
 }
 
 // ── Calendar ──

@@ -17,7 +17,13 @@ export function SymbolSearch({ value, onChange }: SymbolSearchProps) {
   const filtered = useMemo(() => {
     if (!assets || !query) return [];
     const q = query.toUpperCase();
-    return assets.filter((a) => a.tradable && (a.symbol.includes(q) || a.name.toUpperCase().includes(q))).slice(0, 20);
+    return assets
+      .filter(
+        (a) =>
+          a.tradable &&
+          (a.symbol.includes(q) || a.symbol.replace('/', '').includes(q) || a.name.toUpperCase().includes(q)),
+      )
+      .slice(0, 20);
   }, [assets, query]);
 
   useEffect(() => {

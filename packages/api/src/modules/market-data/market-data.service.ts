@@ -5,6 +5,8 @@ import {
   CACHE_TTL_CLOCK,
   CACHE_TTL_QUOTES,
   CACHE_TTL_SNAPSHOTS,
+  isCryptoSymbol,
+  normalizeCryptoSymbol,
 } from '@algoarena/shared';
 import { Injectable } from '@nestjs/common';
 import { ValkeyProvider } from '../cache/valkey.provider';
@@ -29,17 +31,18 @@ export class MarketDataService {
   // ── Quotes ──
 
   async getQuote(symbol: string): Promise<Quote> {
-    const key = `quote:${symbol.toUpperCase()}`;
+    const sym = this.normalizeSymbol(symbol);
+    const key = `quote:${sym}`;
     const cached = await this.cache.get<Quote>(key);
     if (cached) return cached;
 
-    const quote = await this.provider.getLatestQuote(symbol);
+    const quote = await this.provider.getLatestQuote(sym);
     await this.cache.set(key, quote, CACHE_TTL_QUOTES);
     return quote;
   }
 
   async getQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-    const upper = symbols.map((s) => s.toUpperCase());
+    const upper = symbols.map((s) => this.normalizeSymbol(s));
     const result: Record<string, Quote> = {};
     const uncached: string[] = [];
 
@@ -69,7 +72,7 @@ export class MarketDataService {
     symbol: string,
     params: { timeframe: string; start?: string; end?: string; limit?: number },
   ): Promise<BarsResponse> {
-    const sym = symbol.toUpperCase();
+    const sym = this.normalizeSymbol(symbol);
     const key = `bars:${sym}:${params.timeframe}:${params.start ?? ''}:${params.end ?? ''}:${params.limit ?? ''}`;
 
     const cached = await this.cache.get<BarsResponse>(key);
@@ -84,7 +87,7 @@ export class MarketDataService {
     symbols: string[],
     params: { timeframe: string; start?: string; end?: string; limit?: number },
   ): Promise<MultiBarsResponse> {
-    const upper = symbols.map((s) => s.toUpperCase());
+    const upper = symbols.map((s) => this.normalizeSymbol(s));
     const result: Record<string, BarsResponse> = {};
     const uncached: string[] = [];
 
@@ -119,11 +122,12 @@ export class MarketDataService {
   // ── Snapshots ──
 
   async getSnapshot(symbol: string): Promise<Snapshot> {
-    const key = `snapshot:${symbol.toUpperCase()}`;
+    const sym = this.normalizeSymbol(symbol);
+    const key = `snapshot:${sym}`;
     const cached = await this.cache.get<Snapshot>(key);
     if (cached) return cached;
 
-    const snapshot = await this.provider.getSnapshot(symbol);
+    const snapshot = await this.provider.getSnapshot(sym);
     await this.cache.set(key, snapshot, CACHE_TTL_SNAPSHOTS);
     return snapshot;
   }
@@ -169,5 +173,11 @@ export class MarketDataService {
     const calendar = await this.provider.getCalendar(params);
     await this.cache.set(key, calendar, CACHE_TTL_CALENDAR);
     return calendar;
+  }
+
+  // ── Private Helpers ──
+
+  private normalizeSymbol(symbol: string): string {
+    return isCryptoSymbol(symbol) ? normalizeCryptoSymbol(symbol) : symbol.toUpperCase();
   }
 }

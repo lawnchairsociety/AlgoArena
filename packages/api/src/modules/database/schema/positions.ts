@@ -7,6 +7,7 @@ export const positions = pgTable('positions', {
     .notNull()
     .references(() => cuidUsers.id),
   symbol: text('symbol').notNull(),
+  assetClass: text('asset_class').notNull().default('us_equity'),
   quantity: numeric('quantity', { precision: 14, scale: 6 }).notNull(),
   avgCostBasis: numeric('avg_cost_basis', { precision: 14, scale: 4 }).notNull(),
   totalCostBasis: numeric('total_cost_basis', { precision: 14, scale: 2 }).notNull(),

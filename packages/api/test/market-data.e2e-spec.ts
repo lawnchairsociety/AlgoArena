@@ -106,4 +106,30 @@ describe('Market Data (e2e)', () => {
 
     expect(Array.isArray(res.body)).toBe(true);
   });
+
+  // ── Crypto Market Data ──
+
+  it('GET /api/v1/market/clock?class=crypto — always open', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/market/clock?class=crypto')
+      .set('x-algoarena-cuid', userCuid)
+      .expect(200);
+
+    expect(res.body.isOpen).toBe(true);
+    expect(res.body.nextOpen).toBeNull();
+    expect(res.body.nextClose).toBeNull();
+  });
+
+  it('GET /api/v1/market/quotes/BTC%2FUSD — crypto quote', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/market/quotes/BTC%2FUSD')
+      .set('x-algoarena-cuid', userCuid);
+
+    // Alpaca sandbox may not serve crypto — accept 200 or 400
+    expect([200, 400]).toContain(res.status);
+    if (res.status === 200) {
+      expect(res.body).toHaveProperty('askPrice');
+      expect(res.body).toHaveProperty('bidPrice');
+    }
+  });
 });

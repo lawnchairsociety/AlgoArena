@@ -67,6 +67,9 @@ export interface Asset {
   easyToBorrow: boolean;
   fractionable: boolean;
   maintenanceMarginRequirement?: number;
+  minOrderSize?: string;
+  minTradeIncrement?: string;
+  priceIncrement?: string;
 }
 
 export interface CalendarDay {

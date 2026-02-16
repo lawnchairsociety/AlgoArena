@@ -6,7 +6,7 @@ export function useQuote(symbol: string | null) {
   return useQuery({
     queryKey: ['quote', symbol],
     queryFn: async () => {
-      const { data } = await apiClient.get<Quote>(`/market/quotes/${symbol}`);
+      const { data } = await apiClient.get<Quote>(`/market/quotes/${encodeURIComponent(symbol!)}`);
       return data;
     },
     enabled: !!symbol,

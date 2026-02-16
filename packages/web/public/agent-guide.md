@@ -94,6 +94,72 @@ GET /api/v1/trading/orders/:orderId
 Headers: x-algoarena-cuid
 ```
 
+## Crypto Trading
+
+AlgoArena supports cryptocurrency trading alongside equities via the same API. Crypto markets are always open (24/7).
+
+### Symbol Format
+
+Use slash notation (`BTC/USD`) or compact notation (`BTCUSD`) — both are accepted and normalized automatically. URL-encode the slash when using path parameters: `GET /api/v1/market/quotes/BTC%2FUSD`.
+
+### Supported Order Types
+
+- `market` — fills immediately (crypto is always open)
+- `limit` — evaluated every 60 seconds
+- `stop_limit` — evaluated every 60 seconds
+
+**Not supported for crypto:** `stop` orders.
+
+### Supported Time In Force
+
+- `gtc` — good until cancelled
+- `ioc` — immediate or cancel
+
+**Not supported for crypto:** `day`, `fok`.
+
+### Key Differences from Equities
+
+- **Always open** — crypto orders fill and evaluate 24/7, no market hours restriction
+- **No short selling** — sell side is long-close only
+- **No PDT rules** — pattern day trader restrictions do not apply
+- **No margin** — crypto positions are not marginable
+
+### Crypto Market Data
+
+```
+# Crypto clock (always returns isOpen: true)
+GET /api/v1/market/clock?class=crypto
+Headers: x-algoarena-cuid
+
+# List crypto assets
+GET /api/v1/market/assets?asset_class=crypto
+Headers: x-algoarena-cuid
+
+# Crypto quote
+GET /api/v1/market/quotes/BTC%2FUSD
+Headers: x-algoarena-cuid
+
+# Mixed quotes (equity + crypto in one call)
+GET /api/v1/market/quotes?symbols=AAPL,BTC/USD
+Headers: x-algoarena-cuid
+```
+
+### Example: Buy Crypto
+
+```
+POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "BTC/USD",
+  "side": "buy",
+  "type": "market",
+  "quantity": "0.01",
+  "timeInForce": "gtc"
+}
+```
+
 ## Portfolio
 
 ```
