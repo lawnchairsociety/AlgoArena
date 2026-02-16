@@ -9,7 +9,15 @@ import {
 import { Injectable } from '@nestjs/common';
 import { ValkeyProvider } from '../cache/valkey.provider';
 import { MarketDataProvider } from './market-data.provider';
-import { Asset, BarsResponse, CalendarDay, MarketClock, Quote, Snapshot } from './types/market-data-provider.types';
+import {
+  Asset,
+  BarsResponse,
+  CalendarDay,
+  MarketClock,
+  MultiBarsResponse,
+  Quote,
+  Snapshot,
+} from './types/market-data-provider.types';
 
 @Injectable()
 export class MarketDataService {
@@ -70,6 +78,42 @@ export class MarketDataService {
     const bars = await this.provider.getBars(sym, params);
     await this.cache.set(key, bars, CACHE_TTL_BARS);
     return bars;
+  }
+
+  async getMultiBars(
+    symbols: string[],
+    params: { timeframe: string; start?: string; end?: string; limit?: number },
+  ): Promise<MultiBarsResponse> {
+    const upper = symbols.map((s) => s.toUpperCase());
+    const result: Record<string, BarsResponse> = {};
+    const uncached: string[] = [];
+
+    for (const sym of upper) {
+      const key = `bars:${sym}:${params.timeframe}:${params.start ?? ''}:${params.end ?? ''}:${params.limit ?? ''}`;
+      const cached = await this.cache.get<BarsResponse>(key);
+      if (cached) {
+        result[sym] = cached;
+      } else {
+        uncached.push(sym);
+      }
+    }
+
+    if (uncached.length > 0) {
+      const fresh = await this.provider.getMultiBars(uncached, params);
+      for (const [sym, bars] of Object.entries(fresh.bars)) {
+        const barsResponse: BarsResponse = { bars, symbol: sym, nextPageToken: fresh.nextPageToken };
+        result[sym] = barsResponse;
+        const key = `bars:${sym}:${params.timeframe}:${params.start ?? ''}:${params.end ?? ''}:${params.limit ?? ''}`;
+        await this.cache.set(key, barsResponse, CACHE_TTL_BARS);
+      }
+    }
+
+    const bars: Record<string, BarsResponse['bars']> = {};
+    for (const [sym, barsResponse] of Object.entries(result)) {
+      bars[sym] = barsResponse.bars;
+    }
+
+    return { bars, nextPageToken: null };
   }
 
   // ── Snapshots ──

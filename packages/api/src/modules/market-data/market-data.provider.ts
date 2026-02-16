@@ -1,4 +1,12 @@
-import { Asset, BarsResponse, CalendarDay, MarketClock, Quote, Snapshot } from './types/market-data-provider.types';
+import {
+  Asset,
+  BarsResponse,
+  CalendarDay,
+  MarketClock,
+  MultiBarsResponse,
+  Quote,
+  Snapshot,
+} from './types/market-data-provider.types';
 
 /**
  * Abstract market data provider.
@@ -21,6 +29,12 @@ export abstract class MarketDataProvider {
     symbol: string,
     params: { timeframe: string; start?: string; end?: string; limit?: number },
   ): Promise<BarsResponse>;
+
+  /** Get historical bars for multiple symbols. */
+  abstract getMultiBars(
+    symbols: string[],
+    params: { timeframe: string; start?: string; end?: string; limit?: number },
+  ): Promise<MultiBarsResponse>;
 
   /** Get a market snapshot for a symbol. */
   abstract getSnapshot(symbol: string): Promise<Snapshot>;

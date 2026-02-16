@@ -8,6 +8,7 @@ import {
   AlpacaBarsResponse,
   AlpacaCalendarDay,
   AlpacaClock,
+  AlpacaMultiBarsResponse,
   AlpacaMultiQuoteResponse,
   AlpacaQuote,
   AlpacaQuoteResponse,
@@ -19,6 +20,7 @@ import {
   BarsResponse,
   CalendarDay,
   MarketClock,
+  MultiBarsResponse,
   Quote,
   Snapshot,
 } from './types/market-data-provider.types';
@@ -71,6 +73,21 @@ export class AlpacaClientService extends MarketDataProvider {
       symbol: res.symbol,
       nextPageToken: res.next_page_token,
     };
+  }
+
+  async getMultiBars(
+    symbols: string[],
+    params: { timeframe: string; start?: string; end?: string; limit?: number },
+  ): Promise<MultiBarsResponse> {
+    const res = await this.dataRequest<AlpacaMultiBarsResponse>('/v2/stocks/bars', {
+      symbols: symbols.join(','),
+      ...(params as Record<string, string | number>),
+    });
+    const bars: Record<string, Bar[]> = {};
+    for (const [sym, alpacaBars] of Object.entries(res.bars || {})) {
+      bars[sym] = alpacaBars.map((b) => this.mapBar(b));
+    }
+    return { bars, nextPageToken: res.next_page_token };
   }
 
   async getSnapshot(symbol: string): Promise<Snapshot> {

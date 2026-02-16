@@ -28,6 +28,11 @@ export interface BarsResponse {
   nextPageToken: string | null;
 }
 
+export interface MultiBarsResponse {
+  bars: Record<string, Bar[]>;
+  nextPageToken: string | null;
+}
+
 export interface Trade {
   timestamp: string;
   price: number;
