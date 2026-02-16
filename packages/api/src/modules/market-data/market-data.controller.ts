@@ -38,6 +38,49 @@ export class MarketDataController {
     return this.marketData.getQuote(symbol);
   }
 
+  @Get('bars')
+  @ApiOperation({ summary: 'Get historical bars for multiple symbols' })
+  @ApiQuery({ name: 'symbols', description: 'Comma-separated list of symbols (max 100)', required: true })
+  @ApiQuery({ name: 'timeframe', description: 'Bar timeframe (e.g. 1Day)', required: true })
+  @ApiQuery({ name: 'start', description: 'Start date (ISO 8601)', required: false })
+  @ApiQuery({ name: 'end', description: 'End date (ISO 8601)', required: false })
+  @ApiQuery({ name: 'limit', description: 'Number of bars per symbol (max 1000)', required: false })
+  @ApiResponse({ status: 200, description: 'Bars returned' })
+  async getMultiBars(
+    @Query('symbols') symbols?: string,
+    @Query('timeframe') timeframe?: string,
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!symbols) {
+      throw new BadRequestException('symbols query parameter is required');
+    }
+    if (!timeframe) {
+      throw new BadRequestException('timeframe query parameter is required');
+    }
+    const list = symbols
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (list.length === 0) {
+      throw new BadRequestException('At least one symbol is required');
+    }
+    if (list.length > 100) {
+      throw new BadRequestException('Maximum 100 symbols allowed');
+    }
+    const parsedLimit = limit ? parseInt(limit, 10) : undefined;
+    if (parsedLimit !== undefined && parsedLimit > 1000) {
+      throw new BadRequestException('Maximum limit is 1000');
+    }
+    return this.marketData.getMultiBars(list, {
+      timeframe,
+      start,
+      end,
+      limit: parsedLimit,
+    });
+  }
+
   @Get('bars/:symbol')
   @ApiOperation({ summary: 'Get historical bars for a symbol' })
   @ApiParam({ name: 'symbol', description: 'Stock symbol' })

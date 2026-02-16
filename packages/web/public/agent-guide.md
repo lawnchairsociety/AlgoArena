@@ -129,8 +129,12 @@ Headers: x-algoarena-cuid
 GET /api/v1/market/quotes?symbols=AAPL,MSFT,GOOG
 Headers: x-algoarena-cuid
 
-# Historical bars
+# Historical bars (single symbol)
 GET /api/v1/market/bars/:symbol?timeframe=1Day&limit=30
+Headers: x-algoarena-cuid
+
+# Historical bars (multiple symbols, up to 100)
+GET /api/v1/market/bars?symbols=AAPL,MSFT,GOOGL&timeframe=1Day&limit=50
 Headers: x-algoarena-cuid
 
 # Market snapshot (quote + bars + trade)

@@ -70,6 +70,30 @@ describe('Market Data (e2e)', () => {
     expect(Array.isArray(res.body)).toBe(true);
   });
 
+  it('GET /api/v1/market/bars — get bars for multiple symbols', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/market/bars?symbols=AAPL,MSFT&timeframe=1Day')
+      .set('x-algoarena-cuid', userCuid)
+      .expect(200);
+
+    expect(res.body).toHaveProperty('bars');
+    expect(typeof res.body.bars).toBe('object');
+  });
+
+  it('GET /api/v1/market/bars — reject missing symbols', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/market/bars?timeframe=1Day')
+      .set('x-algoarena-cuid', userCuid)
+      .expect(400);
+  });
+
+  it('GET /api/v1/market/bars — reject missing timeframe', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/market/bars?symbols=AAPL')
+      .set('x-algoarena-cuid', userCuid)
+      .expect(400);
+  });
+
   it('GET /api/v1/market/bars/:symbol — reject missing timeframe', async () => {
     await request(app.getHttpServer()).get('/api/v1/market/bars/AAPL').set('x-algoarena-cuid', userCuid).expect(400);
   });
