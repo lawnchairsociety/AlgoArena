@@ -63,7 +63,7 @@ Content-Type: application/json
 {
   "symbol": "AAPL",
   "side": "buy",            // buy | sell
-  "type": "market",         // market | limit | stop | stop_limit
+  "type": "market",         // market | limit | stop | stop_limit | trailing_stop
   "quantity": "10",          // string, supports up to 6 decimal places
   "timeInForce": "day",     // day | gtc | ioc | fok
   "limitPrice": "150.00",   // required for limit and stop_limit orders
@@ -107,6 +107,7 @@ Use slash notation (`BTC/USD`) or compact notation (`BTCUSD`) — both are accep
 - `market` — fills immediately (crypto is always open)
 - `limit` — evaluated every 60 seconds
 - `stop_limit` — evaluated every 60 seconds
+- `trailing_stop` — sell-side only, server-side HWM tracking, evaluated every 60 seconds
 
 **Not supported for crypto:** `stop` orders.
 
@@ -159,6 +160,39 @@ Content-Type: application/json
   "timeInForce": "gtc"
 }
 ```
+
+## Trailing Stop Orders
+
+Trailing stops automatically adjust the stop price as the market moves in your favor. The server tracks the high-water mark (HWM) and computes the trigger price every 60 seconds.
+
+### Rules
+
+- **Sell-side only** — trailing stops close existing long positions
+- **One trail parameter** — set `trailPercent` OR `trailPrice`, not both
+- `trailPercent`: percentage drop from HWM to trigger (> 0, <= 50)
+- `trailPrice`: dollar amount drop from HWM to trigger (> 0)
+- **Time in force**: `day` or `gtc` only (`ioc`/`fok` not supported)
+- **Works for crypto** — use `gtc` time-in-force
+- `limitPrice` and `stopPrice` must NOT be set
+
+### Example
+
+```
+POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "AAPL",
+  "side": "sell",
+  "type": "trailing_stop",
+  "quantity": "10",
+  "trailPercent": "3.0",
+  "timeInForce": "gtc"
+}
+```
+
+The response includes `highWaterMark` and `trailingStopPrice` fields showing the initial HWM (current bid) and computed stop price. These update automatically as the price rises.
 
 ## Portfolio
 
@@ -273,6 +307,7 @@ heartbeat               — every 30 seconds
 - **Market orders:** Fill immediately at ask (buy) or bid (sell) during market hours. Queued until 9:30 AM ET if placed outside hours.
 - **Limit orders:** Evaluated every 60 seconds during market hours.
 - **Stop / Stop-limit orders:** Trigger evaluated every 60 seconds during market hours.
+- **Trailing stop orders:** Sell-side only. HWM tracked server-side, evaluated every 60 seconds. Triggers when bid drops to or below the trailing stop price.
 - **IOC (Immediate or Cancel):** Evaluated once at placement. Cancelled if not fillable.
 - **FOK (Fill or Kill):** Evaluated once at placement. Rejected if not fully fillable.
 - **Day orders:** Automatically expired at 4:00 PM ET.

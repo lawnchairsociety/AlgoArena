@@ -23,6 +23,14 @@ export class PlaceOrderDto {
   @IsNumberString()
   stopPrice?: string;
 
+  @IsOptional()
+  @IsNumberString()
+  trailPercent?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  trailPrice?: string;
+
   @IsIn([...TIME_IN_FORCE_VALUES])
   timeInForce!: TimeInForce;
 }

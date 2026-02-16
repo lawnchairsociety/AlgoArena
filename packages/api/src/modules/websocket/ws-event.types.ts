@@ -13,6 +13,10 @@ export interface OrderEventPayload {
   rejectionReason?: string | null;
   fillPrice?: string;
   fillQuantity?: string;
+  highWaterMark?: string | null;
+  trailingStopPrice?: string | null;
+  trailPercent?: string | null;
+  trailPrice?: string | null;
 }
 
 export interface MarginWarningPayload {

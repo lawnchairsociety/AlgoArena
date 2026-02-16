@@ -8,7 +8,7 @@ export type AssetClass = (typeof ASSET_CLASSES)[number];
 export const ORDER_SIDES = ['buy', 'sell'] as const;
 export type OrderSide = (typeof ORDER_SIDES)[number];
 
-export const ORDER_TYPES = ['market', 'limit', 'stop', 'stop_limit'] as const;
+export const ORDER_TYPES = ['market', 'limit', 'stop', 'stop_limit', 'trailing_stop'] as const;
 export type OrderType = (typeof ORDER_TYPES)[number];
 
 export const TIME_IN_FORCE_VALUES = ['day', 'gtc', 'ioc', 'fok'] as const;

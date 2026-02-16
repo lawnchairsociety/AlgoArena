@@ -104,7 +104,7 @@ Content-Type: application/json
 {
   "symbol": "AAPL",
   "side": "buy",            // buy | sell
-  "type": "market",         // market | limit | stop | stop_limit
+  "type": "market",         // market | limit | stop | stop_limit | trailing_stop
   "quantity": "10",          // string, supports up to 6 decimal places
   "timeInForce": "day",     // day | gtc | ioc | fok
   "limitPrice": "150.00",   // required for limit and stop_limit orders
@@ -141,7 +141,7 @@ Headers: x-algoarena-cuid`}</Code>
           <h3 className="font-semibold mb-2">Supported Order Types & TIF</h3>
           <div className="text-muted-foreground space-y-1 mb-3">
             <p>
-              <strong>Order types:</strong> market, limit, stop_limit (NOT stop)
+              <strong>Order types:</strong> market, limit, stop_limit, trailing_stop (NOT stop)
             </p>
             <p>
               <strong>Time in force:</strong> gtc, ioc (NOT day, fok)
@@ -181,6 +181,51 @@ Content-Type: application/json
   "quantity": "0.01",
   "timeInForce": "gtc"
 }`}</Code>
+        </Section>
+
+        <Section title="Trailing Stop Orders">
+          <p className="text-muted-foreground mb-3">
+            Trailing stops automatically adjust the stop price as the market moves in your favor. The server tracks the
+            high-water mark (HWM) and computes the trigger price every 60 seconds.
+          </p>
+
+          <h3 className="font-semibold mb-2">Rules</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>Sell-side only — trailing stops close existing long positions</p>
+            <p>
+              Set <code>trailPercent</code> OR <code>trailPrice</code>, not both
+            </p>
+            <p>
+              <code>trailPercent</code>: percentage drop from HWM to trigger ({'>'} 0, {'<='} 50)
+            </p>
+            <p>
+              <code>trailPrice</code>: dollar amount drop from HWM to trigger ({'>'} 0)
+            </p>
+            <p>
+              Time in force: <code>day</code> or <code>gtc</code> only
+            </p>
+            <p>
+              Works for crypto — use <code>gtc</code> time-in-force
+            </p>
+          </div>
+
+          <h3 className="font-semibold mb-2">Example</h3>
+          <Code>{`POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "AAPL",
+  "side": "sell",
+  "type": "trailing_stop",
+  "quantity": "10",
+  "trailPercent": "3.0",
+  "timeInForce": "gtc"
+}`}</Code>
+          <p className="text-muted-foreground text-sm mt-2">
+            The response includes <code>highWaterMark</code> and <code>trailingStopPrice</code> fields showing the
+            initial HWM (current bid) and computed stop price. These update automatically as the price rises.
+          </p>
         </Section>
 
         <Section title="Portfolio">
@@ -294,6 +339,10 @@ heartbeat               — every 30 seconds`}</Code>
             </p>
             <p>
               <strong>Stop / Stop-limit orders:</strong> Trigger evaluated every 60 seconds during market hours.
+            </p>
+            <p>
+              <strong>Trailing stop orders:</strong> Sell-side only. HWM tracked server-side, evaluated every 60
+              seconds. Triggers when bid drops to or below the trailing stop price.
             </p>
             <p>
               <strong>IOC (Immediate or Cancel):</strong> Evaluated once at placement. Cancelled if not fillable.
