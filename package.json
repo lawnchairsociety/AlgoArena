@@ -8,6 +8,7 @@
     "build:web": "pnpm --filter @algoarena/web build",
     "build:shared": "pnpm --filter @algoarena/shared build",
     "test:unit": "pnpm --filter @algoarena/api test:unit",
+    "cleanup:prod": "pnpm --filter @algoarena/api cleanup:prod",
     "lint": "biome check .",
     "lint:fix": "biome check --fix .",
     "format": "biome format --write .",
