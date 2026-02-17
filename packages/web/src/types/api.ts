@@ -86,6 +86,7 @@ export interface Order {
     takeProfitOrderId?: string;
     stopLossOrderId?: string;
   };
+  extendedHours?: boolean;
   status: string;
   rejectionReason: string | null;
   createdAt: string;
@@ -156,6 +157,12 @@ export interface MarketClock {
   isOpen: boolean;
   nextOpen: string;
   nextClose: string;
+  session?: string;
+  sessions?: {
+    preMarket: { start: string; end: string };
+    regular: { start: string; end: string };
+    afterHours: { start: string; end: string };
+  };
 }
 
 export interface Asset {

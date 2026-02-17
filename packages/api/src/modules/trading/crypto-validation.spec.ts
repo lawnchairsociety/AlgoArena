@@ -6,7 +6,15 @@ describe('TradingService — crypto validation', () => {
   let service: TradingService;
 
   beforeEach(() => {
-    service = new TradingService(null as any, null as any, null as any, null as any, null as any, null as any);
+    service = new TradingService(
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+    );
   });
 
   const validateCrypto = (dto: Partial<PlaceOrderDto>) =>

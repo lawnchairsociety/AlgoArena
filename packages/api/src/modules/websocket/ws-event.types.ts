@@ -23,6 +23,13 @@ export interface OrderEventPayload {
     takeProfitOrderId?: string;
     stopLossOrderId?: string;
   };
+  session?: string;
+  extendedHours?: boolean;
+}
+
+export interface MarketSessionPayload {
+  session: string;
+  timestamp: string;
 }
 
 export interface MarginWarningPayload {

@@ -29,6 +29,7 @@ interface FillParams {
   fillPrice: Decimal;
   fillQuantity: Decimal;
   multiplier?: number; // defaults to 1
+  session?: string;
 }
 
 @Injectable()
@@ -170,6 +171,8 @@ export class OrderEngineService {
         trailingStopPrice: order.trailingStopPrice ?? null,
         trailPercent: order.trailPercent ?? null,
         trailPrice: order.trailPrice ?? null,
+        ...(params.session ? { session: params.session } : {}),
+        ...(order.extendedHours ? { extendedHours: true } : {}),
       };
 
       // 7. Update cash balance

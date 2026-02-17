@@ -13,6 +13,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { DrizzleProvider } from '../database/drizzle.provider';
 import { borrows, cuidUsers, orders, portfolioSnapshots, positions } from '../database/schema';
 import { MarketDataService } from '../market-data/market-data.service';
+import { SessionService } from '../market-data/session.service';
 import { Quote } from '../market-data/types/market-data-provider.types';
 import { PortfolioService } from '../portfolio/portfolio.service';
 import { OrderEngineService } from '../trading/order-engine.service';
@@ -31,6 +32,7 @@ export class SchedulerService {
     private readonly priceMonitor: PriceMonitorService,
     readonly _portfolioService: PortfolioService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly sessionService: SessionService,
   ) {
     this.logger.log('SchedulerService initialized');
   }
@@ -43,9 +45,9 @@ export class SchedulerService {
 
     try {
       this.lock('priceMonitor');
-      const clock = await this.marketDataService.getClock();
+      const { session } = await this.sessionService.getCurrentSession();
       // Always run — crypto orders need evaluation even when equity market is closed
-      await this.priceMonitor.evaluatePendingOrders(clock.isOpen);
+      await this.priceMonitor.evaluatePendingOrders(session);
     } catch (error) {
       this.logger.error(`Price monitor error: ${error instanceof Error ? error.message : error}`);
     } finally {
@@ -65,6 +67,11 @@ export class SchedulerService {
 
       this.logger.log('Market open: filling queued market orders');
       await this.priceMonitor.fillQueuedMarketOrders();
+
+      this.eventEmitter.emit('market.session', {
+        session: 'regular',
+        timestamp: new Date().toISOString(),
+      });
     } catch (error) {
       this.logger.error(`Market open error: ${error instanceof Error ? error.message : error}`);
     } finally {
@@ -82,7 +89,7 @@ export class SchedulerService {
       this.lock('marketClose');
       if (!(await this.isTradingDay())) return;
 
-      this.logger.log('Market close: expiring unfilled day orders');
+      this.logger.log('Market close: expiring unfilled day orders (non-extended-hours)');
 
       const result = await this.drizzle.db
         .update(orders)
@@ -96,6 +103,7 @@ export class SchedulerService {
             inArray(orders.status, ['pending', 'partially_filled']),
             eq(orders.timeInForce, 'day'),
             inArray(orders.assetClass, ['us_equity', 'option']),
+            eq(orders.extendedHours, false),
           ),
         )
         .returning({
@@ -119,11 +127,100 @@ export class SchedulerService {
         } satisfies OrderEventPayload);
       }
 
+      this.eventEmitter.emit('market.session', {
+        session: 'after_hours',
+        timestamp: new Date().toISOString(),
+      });
+
       this.logger.log(`Market close: expired ${result.length} day orders`);
     } catch (error) {
       this.logger.error(`Market close error: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.unlock('marketClose');
+    }
+  }
+
+  // ── Extended Hours Close: 8:00 PM ET, Mon-Fri ──
+
+  @Cron('0 0 20 * * 1-5', { timeZone: 'America/New_York' })
+  async handleExtendedHoursClose(): Promise<void> {
+    if (this.isLocked('extendedHoursClose')) return;
+
+    try {
+      this.lock('extendedHoursClose');
+      if (!(await this.isTradingDay())) return;
+
+      this.logger.log('Extended hours close: expiring extended-hours day orders');
+
+      const result = await this.drizzle.db
+        .update(orders)
+        .set({
+          status: 'expired',
+          expiredAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            inArray(orders.status, ['pending', 'partially_filled']),
+            eq(orders.timeInForce, 'day'),
+            eq(orders.extendedHours, true),
+            eq(orders.assetClass, 'us_equity'),
+          ),
+        )
+        .returning({
+          id: orders.id,
+          cuidUserId: orders.cuidUserId,
+          symbol: orders.symbol,
+          side: orders.side,
+          type: orders.type,
+          quantity: orders.quantity,
+        });
+
+      for (const expired of result) {
+        this.eventEmitter.emit('order.expired', {
+          cuidUserId: expired.cuidUserId,
+          orderId: expired.id,
+          symbol: expired.symbol,
+          side: expired.side,
+          type: expired.type,
+          quantity: expired.quantity,
+          status: 'expired',
+        } satisfies OrderEventPayload);
+      }
+
+      this.eventEmitter.emit('market.session', {
+        session: 'closed',
+        timestamp: new Date().toISOString(),
+      });
+
+      this.logger.log(`Extended hours close: expired ${result.length} extended-hours day orders`);
+    } catch (error) {
+      this.logger.error(`Extended hours close error: ${error instanceof Error ? error.message : error}`);
+    } finally {
+      this.unlock('extendedHoursClose');
+    }
+  }
+
+  // ── Pre-Market Session: 4:00 AM ET, Mon-Fri ──
+
+  @Cron('0 0 4 * * 1-5', { timeZone: 'America/New_York' })
+  async handlePreMarketSession(): Promise<void> {
+    if (this.isLocked('preMarketSession')) return;
+
+    try {
+      this.lock('preMarketSession');
+      if (!(await this.isTradingDay())) return;
+
+      this.eventEmitter.emit('market.session', {
+        session: 'pre_market',
+        timestamp: new Date().toISOString(),
+      });
+
+      this.logger.log('Pre-market session started');
+    } catch (error) {
+      this.logger.error(`Pre-market session error: ${error instanceof Error ? error.message : error}`);
+    } finally {
+      this.unlock('preMarketSession');
     }
   }
 

@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import {
   CRYPTO_ALLOWED_ORDER_TYPES,
   CRYPTO_ALLOWED_TIF,
+  EXTENDED_HOURS_ALLOWED_ORDER_TYPES,
+  EXTENDED_HOURS_ALLOWED_TIF,
   INITIAL_MARGIN_REQUIREMENT,
   isCryptoSymbol,
   isOptionSymbol,
@@ -20,6 +22,7 @@ import { DrizzleProvider } from '../database/drizzle.provider';
 import { borrowFeeTiers, cuidUsers, fills, orders, positions } from '../database/schema';
 import { MarketDataProvider } from '../market-data/market-data.provider';
 import { MarketDataService } from '../market-data/market-data.service';
+import { SessionService } from '../market-data/session.service';
 import { Asset, Quote } from '../market-data/types/market-data-provider.types';
 import { OrderEventPayload } from '../websocket/ws-event.types';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
@@ -38,6 +41,7 @@ export class TradingService {
     private readonly orderEngine: OrderEngineService,
     private readonly pdtService: PdtService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly sessionService: SessionService,
   ) {}
 
   // ── Public Methods ──
@@ -60,6 +64,13 @@ export class TradingService {
     // 2. Asset-specific constraints
     if (isCrypto) this.validateCryptoConstraints(dto);
     if (isOption) this.validateOptionsConstraints(dto);
+
+    // 2b. Extended hours constraints
+    if (dto.extendedHours) {
+      if (isCrypto) throw new BadRequestException('Extended hours not applicable for crypto (trades 24/7)');
+      if (isOption) throw new BadRequestException('Extended hours not supported for options');
+      this.validateExtendedHoursConstraints(dto);
+    }
 
     // 3. Validate symbol
     let asset: Asset | null = null;
@@ -221,6 +232,7 @@ export class TradingService {
         stopPrice: dto.stopPrice ?? null,
         trailPercent: dto.trailPercent ?? null,
         trailPrice: dto.trailPrice ?? null,
+        extendedHours: dto.extendedHours ?? false,
         ...(dto.bracket
           ? {
               bracketGroupId: randomUUID(),
@@ -330,6 +342,21 @@ export class TradingService {
               quantity: order.quantity,
               status: 'cancelled',
             } satisfies OrderEventPayload);
+          }
+        }
+      }
+      // Extended hours immediate fill: if limit order with extendedHours, evaluate now if session allows
+      if (dto.extendedHours && dto.type === 'limit' && dto.timeInForce !== 'ioc' && dto.timeInForce !== 'fok') {
+        const { session } = await this.sessionService.getCurrentSession();
+        if (session === 'pre_market' || session === 'regular' || session === 'after_hours') {
+          const fillPrice = this.orderEngine.evaluateOrderConditions(dto.type, dto.side, quote, dto.limitPrice);
+          if (fillPrice) {
+            await this.orderEngine.executeFill({
+              orderId: order.id,
+              fillPrice,
+              fillQuantity,
+              multiplier: effectiveMultiplier,
+            });
           }
         }
       }
@@ -609,6 +636,25 @@ export class TradingService {
     }
     if (dto.bracket) {
       throw new BadRequestException('Bracket orders are not supported for options');
+    }
+  }
+
+  private validateExtendedHoursConstraints(dto: PlaceOrderDto): void {
+    if (!(EXTENDED_HOURS_ALLOWED_ORDER_TYPES as readonly string[]).includes(dto.type)) {
+      throw new BadRequestException(
+        `Order type '${dto.type}' not supported for extended hours. Only limit orders allowed.`,
+      );
+    }
+    if (!(EXTENDED_HOURS_ALLOWED_TIF as readonly string[]).includes(dto.timeInForce)) {
+      throw new BadRequestException(
+        `Time in force '${dto.timeInForce}' not supported for extended hours. Allowed: ${EXTENDED_HOURS_ALLOWED_TIF.join(', ')}`,
+      );
+    }
+    if (dto.bracket) {
+      throw new BadRequestException('Bracket orders cannot be combined with extended hours');
+    }
+    if (dto.trailPercent || dto.trailPrice) {
+      throw new BadRequestException('Trailing stop parameters cannot be combined with extended hours');
     }
   }
 
