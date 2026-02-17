@@ -17,6 +17,12 @@ export interface OrderEventPayload {
   trailingStopPrice?: string | null;
   trailPercent?: string | null;
   trailPrice?: string | null;
+  bracketRole?: string | null;
+  bracketGroupId?: string | null;
+  bracket?: {
+    takeProfitOrderId?: string;
+    stopLossOrderId?: string;
+  };
 }
 
 export interface MarginWarningPayload {

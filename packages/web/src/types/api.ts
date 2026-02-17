@@ -67,6 +67,17 @@ export interface Order {
   trailPrice: string | null;
   highWaterMark: string | null;
   trailingStopPrice: string | null;
+  parentOrderId: string | null;
+  bracketGroupId: string | null;
+  bracketRole: string | null;
+  linkedOrderId: string | null;
+  takeProfitLimitPrice: string | null;
+  stopLossStopPrice: string | null;
+  stopLossLimitPrice: string | null;
+  bracket?: {
+    takeProfitOrderId?: string;
+    stopLossOrderId?: string;
+  };
   status: string;
   rejectionReason: string | null;
   createdAt: string;

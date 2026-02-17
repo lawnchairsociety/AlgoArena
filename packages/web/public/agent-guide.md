@@ -194,6 +194,95 @@ Content-Type: application/json
 
 The response includes `highWaterMark` and `trailingStopPrice` fields showing the initial HWM (current bid) and computed stop price. These update automatically as the price rises.
 
+## Bracket Orders (OTO / OCO)
+
+Bracket orders let you attach take-profit and/or stop-loss exits to any entry order. When the entry fills, the server automatically creates the child exit orders and links them as an OCO pair — when one child fills, the other is cancelled.
+
+### Request Format
+
+Add a `bracket` object to any order (except `trailing_stop`):
+
+```
+POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "AAPL",
+  "side": "buy",
+  "type": "market",
+  "quantity": "10",
+  "timeInForce": "day",
+  "bracket": {
+    "takeProfit": {
+      "limitPrice": "200.00"
+    },
+    "stopLoss": {
+      "stopPrice": "170.00"
+    }
+  }
+}
+```
+
+### Rules
+
+- **Optional on any order type** except `trailing_stop`
+- `bracket.takeProfit` and `bracket.stopLoss` are each optional, but at least one must be present
+- **Children auto-created on full fill** — the server creates opposite-side limit (TP) and stop/stop_limit (SL) child orders
+- **OCO behavior** — TP and SL are linked; when one fills, the other is cancelled automatically
+- For **buy** brackets: `takeProfit.limitPrice` must be > `stopLoss.stopPrice`
+- For **sell** brackets: `takeProfit.limitPrice` must be < `stopLoss.stopPrice`
+- Child orders are always `gtc` time-in-force
+
+### Stop-Limit Exit Example
+
+To use a stop-limit (instead of a bare stop) for the stop-loss child, include `limitPrice` in the `stopLoss`:
+
+```
+"bracket": {
+  "takeProfit": { "limitPrice": "200.00" },
+  "stopLoss": { "stopPrice": "170.00", "limitPrice": "169.50" }
+}
+```
+
+### Response
+
+When the entry fills, the response includes child order IDs:
+
+```json
+{
+  "id": "entry-order-uuid",
+  "status": "filled",
+  "bracket": {
+    "takeProfitOrderId": "tp-child-uuid",
+    "stopLossOrderId": "sl-child-uuid"
+  }
+}
+```
+
+### Standalone OCO
+
+You can link any two pending orders as an OCO pair (without a bracket entry) using `ocoLinkedTo`:
+
+```
+POST /api/v1/trading/orders
+{
+  "symbol": "AAPL",
+  "side": "sell",
+  "type": "limit",
+  "quantity": "10",
+  "limitPrice": "200.00",
+  "timeInForce": "gtc",
+  "ocoLinkedTo": "existing-order-uuid"
+}
+```
+
+Both orders must be for the same symbol. When one fills, the other is automatically cancelled.
+
+### Crypto Note
+
+For crypto brackets, `stopLoss` requires `limitPrice` (stop_limit). Bare stop orders are not supported for crypto assets.
+
 ## Portfolio
 
 ```
@@ -312,6 +401,7 @@ heartbeat               — every 30 seconds
 - **FOK (Fill or Kill):** Evaluated once at placement. Rejected if not fully fillable.
 - **Day orders:** Automatically expired at 4:00 PM ET.
 - **Short selling:** Supported with 50% initial margin, 25% maintenance margin, and tiered borrow fees.
+- **Bracket orders (OTO/OCO):** Attach `bracket.takeProfit` and/or `bracket.stopLoss` to any order (except trailing_stop). Children are created on full fill and linked as OCO — when one fills, the other is cancelled.
 - **Fractional shares:** Quantities support up to 6 decimal places.
 
 ## Stats

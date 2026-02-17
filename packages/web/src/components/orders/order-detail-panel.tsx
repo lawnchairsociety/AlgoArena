@@ -34,6 +34,21 @@ export function OrderDetailPanel({ orderId, onClose }: { orderId: string; onClos
     { label: 'Created', value: formatDateTime(order.createdAt) },
   ];
 
+  if (order.bracketRole) {
+    details.push({ label: 'Bracket Role', value: order.bracketRole.replace('_', ' ') });
+  }
+  if (order.bracket?.takeProfitOrderId) {
+    details.push({ label: 'Take Profit Order', value: `${order.bracket.takeProfitOrderId.slice(0, 8)}...` });
+  }
+  if (order.bracket?.stopLossOrderId) {
+    details.push({ label: 'Stop Loss Order', value: `${order.bracket.stopLossOrderId.slice(0, 8)}...` });
+  }
+  if (order.parentOrderId) {
+    details.push({ label: 'Parent Order', value: `${order.parentOrderId.slice(0, 8)}...` });
+  }
+  if (order.linkedOrderId) {
+    details.push({ label: 'OCO Linked To', value: `${order.linkedOrderId.slice(0, 8)}...` });
+  }
   if (order.rejectionReason) {
     details.push({ label: 'Rejection Reason', value: order.rejectionReason });
   }
