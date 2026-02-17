@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { WsAdapter } from '@nestjs/platform-ws';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
@@ -22,6 +23,7 @@ export async function createTestApp(): Promise<NestFastifyApplication> {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
+  app.useWebSocketAdapter(new WsAdapter(app));
 
   await app.init();
   await app.getHttpAdapter().getInstance().ready();

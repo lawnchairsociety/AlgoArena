@@ -14,6 +14,9 @@ import {
   OrderEventPayload,
   PdtRestrictedPayload,
   PdtWarningPayload,
+  RiskLossLimitPayload,
+  RiskOrderRejectedPayload,
+  RiskWarningPayload,
 } from './ws-event.types';
 
 interface TaggedWebSocket extends WebSocket {
@@ -153,6 +156,21 @@ export class AlgoArenaGateway implements OnGatewayInit, OnGatewayConnection, OnG
   @OnEvent('market.session')
   handleMarketSession(payload: MarketSessionPayload): void {
     this.broadcastToAll('market.session', payload);
+  }
+
+  @OnEvent('risk.order_rejected')
+  handleRiskOrderRejected(payload: RiskOrderRejectedPayload): void {
+    this.sendToUser(payload.cuidUserId, 'risk.order_rejected', payload);
+  }
+
+  @OnEvent('risk.loss_limit')
+  handleRiskLossLimit(payload: RiskLossLimitPayload): void {
+    this.sendToUser(payload.cuidUserId, 'risk.loss_limit', payload);
+  }
+
+  @OnEvent('risk.warning')
+  handleRiskWarning(payload: RiskWarningPayload): void {
+    this.sendToUser(payload.cuidUserId, 'risk.warning', payload);
   }
 
   // ── Helpers ──

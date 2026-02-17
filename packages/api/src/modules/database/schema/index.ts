@@ -8,3 +8,5 @@ export * from './fills';
 export * from './orders';
 export * from './portfolio-snapshots';
 export * from './positions';
+export * from './risk-controls';
+export * from './risk-events';

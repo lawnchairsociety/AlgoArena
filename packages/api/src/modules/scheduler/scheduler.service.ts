@@ -6,17 +6,18 @@ import {
   parseOptionSymbol,
 } from '@algoarena/shared';
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Cron } from '@nestjs/schedule';
 import Decimal from 'decimal.js';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DrizzleProvider } from '../database/drizzle.provider';
-import { borrows, cuidUsers, orders, portfolioSnapshots, positions } from '../database/schema';
+import { borrows, cuidUsers, orders, portfolioSnapshots, positions, riskControls } from '../database/schema';
 import { MarketDataService } from '../market-data/market-data.service';
 import { SessionService } from '../market-data/session.service';
 import { Quote } from '../market-data/types/market-data-provider.types';
 import { PortfolioService } from '../portfolio/portfolio.service';
 import { OrderEngineService } from '../trading/order-engine.service';
+import { RiskControlService } from '../trading/risk-control.service';
 import { MarginLiquidationPayload, MarginWarningPayload, OrderEventPayload } from '../websocket/ws-event.types';
 import { PriceMonitorService } from './price-monitor.service';
 
@@ -33,6 +34,7 @@ export class SchedulerService {
     readonly _portfolioService: PortfolioService,
     private readonly eventEmitter: EventEmitter2,
     private readonly sessionService: SessionService,
+    private readonly riskControlService: RiskControlService,
   ) {
     this.logger.log('SchedulerService initialized');
   }
@@ -542,6 +544,256 @@ export class SchedulerService {
       this.logger.error(`Option expiration error: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.unlock('optionExpirations');
+    }
+  }
+
+  // ── Risk Auto-Flatten ──
+
+  @OnEvent('risk.auto_flatten')
+  async handleRiskAutoFlatten(payload: { cuidUserId: string; controlName: string; message: string }): Promise<void> {
+    const { cuidUserId, controlName, message } = payload;
+    this.logger.warn(`Risk auto-flatten for user ${cuidUserId}: ${message}`);
+
+    try {
+      // 1. Cancel all pending orders
+      const cancelledOrders = await this.drizzle.db
+        .update(orders)
+        .set({
+          status: 'cancelled',
+          cancelledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(orders.cuidUserId, cuidUserId), inArray(orders.status, ['pending', 'partially_filled'])))
+        .returning({ id: orders.id });
+
+      // 2. Close all positions with market orders
+      const userPositions = await this.drizzle.db.select().from(positions).where(eq(positions.cuidUserId, cuidUserId));
+
+      const allSymbols = userPositions.map((p) => p.symbol);
+      const equitySymbols = allSymbols.filter((s) => !isOptionSymbol(s));
+      const optionSymbols = allSymbols.filter((s) => isOptionSymbol(s));
+
+      const quoteMap: Record<string, Quote> = {};
+      if (equitySymbols.length > 0) {
+        const eq = await this.marketDataService.getQuotes(equitySymbols);
+        for (const [sym, q] of Object.entries(eq)) {
+          quoteMap[sym] = q;
+        }
+      }
+      if (optionSymbols.length > 0) {
+        const oq = await this.marketDataService.getOptionQuotes(optionSymbols);
+        for (const [sym, q] of Object.entries(oq)) {
+          quoteMap[sym] = {
+            timestamp: new Date().toISOString(),
+            askPrice: parseFloat(q.ask),
+            askSize: 0,
+            bidPrice: parseFloat(q.bid),
+            bidSize: 0,
+          };
+        }
+      }
+
+      let positionsClosed = 0;
+      for (const pos of userPositions) {
+        const qty = new Decimal(pos.quantity);
+        if (qty.isZero()) continue;
+
+        const closeSide: 'buy' | 'sell' = qty.gt(0) ? 'sell' : 'buy';
+        const absQty = qty.abs();
+        const quote = quoteMap[pos.symbol];
+        if (!quote) continue;
+
+        try {
+          const isOpt = isOptionSymbol(pos.symbol);
+          const multiplier = isOpt ? OPTIONS_MULTIPLIER : 1;
+
+          const [closeOrder] = await this.drizzle.db
+            .insert(orders)
+            .values({
+              cuidUserId,
+              symbol: pos.symbol,
+              assetClass: isOpt ? 'option' : 'us_equity',
+              side: closeSide,
+              type: 'market',
+              timeInForce: 'day',
+              quantity: absQty.toFixed(6),
+            })
+            .returning();
+
+          const fillPrice = this.orderEngine.getMarketFillPrice(closeSide as OrderSide, quote);
+
+          await this.orderEngine.executeFill({
+            orderId: closeOrder.id,
+            fillPrice,
+            fillQuantity: absQty,
+            multiplier,
+          });
+
+          positionsClosed++;
+        } catch (error) {
+          this.logger.error(
+            `Error closing position ${pos.symbol} for user ${cuidUserId}: ${error instanceof Error ? error.message : error}`,
+          );
+        }
+      }
+
+      // 3. Record event
+      await this.riskControlService.recordEvent(cuidUserId, 'auto_flatten', controlName, message, {
+        positionsClosed,
+        ordersCancelled: cancelledOrders.length,
+      });
+
+      // 4. Emit WS event
+      this.eventEmitter.emit('risk.loss_limit', {
+        cuidUserId,
+        control: controlName,
+        dailyPnlPct: '0',
+        limit: '0',
+        action: 'auto_flatten',
+        positionsClosed,
+        ordersCancelled: cancelledOrders.length,
+      });
+
+      this.logger.warn(
+        `Risk auto-flatten complete for ${cuidUserId}: closed ${positionsClosed} positions, cancelled ${cancelledOrders.length} orders`,
+      );
+    } catch (error) {
+      this.logger.error(`Risk auto-flatten error for ${cuidUserId}: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  // ── Loss Limit Monitor: every 60 seconds during market hours ──
+
+  @Cron('*/60 * 9-16 * * 1-5', { timeZone: 'America/New_York' })
+  async handleLossLimitCheck(): Promise<void> {
+    if (this.isLocked('lossLimitCheck')) return;
+
+    try {
+      this.lock('lossLimitCheck');
+      if (!(await this.isTradingDay())) return;
+
+      // Get all users with loss/drawdown limits set
+      const usersWithLimits = await this.drizzle.db
+        .select()
+        .from(riskControls)
+        .where(sql`${riskControls.maxDailyLossPct} is not null or ${riskControls.maxDrawdownPct} is not null`);
+
+      if (usersWithLimits.length === 0) return;
+
+      for (const rc of usersWithLimits) {
+        try {
+          const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, rc.userId)).limit(1);
+          if (!user) continue;
+
+          const cash = new Decimal(user.cashBalance);
+          const startingBalance = new Decimal(user.startingBalance);
+
+          // Get positions for equity calc
+          const userPositions = await this.drizzle.db
+            .select()
+            .from(positions)
+            .where(eq(positions.cuidUserId, rc.userId));
+
+          let positionsValue = new Decimal(0);
+          if (userPositions.length > 0) {
+            const symbols = userPositions.map((p) => p.symbol);
+            const eqSymbols = symbols.filter((s) => !isOptionSymbol(s));
+            const optSymbols = symbols.filter((s) => isOptionSymbol(s));
+
+            const quotes: Record<string, { bidPrice: number; askPrice: number }> = {};
+            if (eqSymbols.length > 0) {
+              const eq = await this.marketDataService.getQuotes(eqSymbols);
+              for (const [sym, q] of Object.entries(eq)) {
+                quotes[sym] = q;
+              }
+            }
+            if (optSymbols.length > 0) {
+              const oq = await this.marketDataService.getOptionQuotes(optSymbols);
+              for (const [sym, q] of Object.entries(oq)) {
+                quotes[sym] = { bidPrice: parseFloat(q.bid), askPrice: parseFloat(q.ask) };
+              }
+            }
+
+            for (const pos of userPositions) {
+              const qty = new Decimal(pos.quantity);
+              const multiplier = new Decimal(pos.multiplier ?? '1');
+              const quote = quotes[pos.symbol];
+              if (quote) {
+                const price = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
+                positionsValue = positionsValue.plus(qty.mul(price).mul(multiplier));
+              }
+            }
+          }
+
+          const totalEquity = cash.plus(positionsValue);
+
+          // Check daily loss
+          if (rc.maxDailyLossPct !== null) {
+            const dailyPnlPct = totalEquity.minus(startingBalance).div(startingBalance);
+            const maxLoss = new Decimal(rc.maxDailyLossPct);
+
+            if (dailyPnlPct.lt(0) && dailyPnlPct.abs().gte(maxLoss)) {
+              if (rc.autoFlattenOnLoss) {
+                this.eventEmitter.emit('risk.auto_flatten', {
+                  cuidUserId: rc.userId,
+                  controlName: 'maxDailyLossPct',
+                  message: `Daily loss ${dailyPnlPct.abs().mul(100).toFixed(2)}% exceeds limit of ${maxLoss.mul(100).toFixed(2)}%`,
+                });
+              } else {
+                this.eventEmitter.emit('risk.warning', {
+                  cuidUserId: rc.userId,
+                  control: 'maxDailyLossPct',
+                  message: `Daily loss limit breached`,
+                  currentValue: dailyPnlPct.abs().mul(100).toFixed(2),
+                  limit: maxLoss.mul(100).toFixed(2),
+                });
+              }
+            }
+          }
+
+          // Check drawdown
+          if (rc.maxDrawdownPct !== null) {
+            const peakSnapshot = await this.drizzle.db
+              .select({ totalEquity: portfolioSnapshots.totalEquity })
+              .from(portfolioSnapshots)
+              .where(eq(portfolioSnapshots.cuidUserId, rc.userId))
+              .orderBy(desc(sql`${portfolioSnapshots.totalEquity}::numeric`))
+              .limit(1);
+
+            const peakEquity = peakSnapshot.length > 0 ? new Decimal(peakSnapshot[0].totalEquity) : startingBalance;
+            const maxDD = new Decimal(rc.maxDrawdownPct);
+
+            if (peakEquity.gt(0)) {
+              const drawdown = peakEquity.minus(totalEquity).div(peakEquity);
+              if (drawdown.gt(0) && drawdown.gte(maxDD)) {
+                if (rc.autoFlattenOnLoss) {
+                  this.eventEmitter.emit('risk.auto_flatten', {
+                    cuidUserId: rc.userId,
+                    controlName: 'maxDrawdownPct',
+                    message: `Drawdown ${drawdown.mul(100).toFixed(2)}% exceeds limit of ${maxDD.mul(100).toFixed(2)}%`,
+                  });
+                } else {
+                  this.eventEmitter.emit('risk.warning', {
+                    cuidUserId: rc.userId,
+                    control: 'maxDrawdownPct',
+                    message: `Drawdown limit breached`,
+                    currentValue: drawdown.mul(100).toFixed(2),
+                    limit: maxDD.mul(100).toFixed(2),
+                  });
+                }
+              }
+            }
+          }
+        } catch (error) {
+          this.logger.error(
+            `Loss limit check error for user ${rc.userId}: ${error instanceof Error ? error.message : error}`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Loss limit check error: ${error instanceof Error ? error.message : error}`);
+    } finally {
+      this.unlock('lossLimitCheck');
     }
   }
 

@@ -495,6 +495,9 @@ margin.warning          — approaching maintenance margin breach
 margin.liquidation      — positions liquidated
 pdt.warning             — approaching PDT limit
 pdt.restricted          — PDT restriction applied
+risk.order_rejected     — order rejected by risk controls
+risk.loss_limit         — loss/drawdown limit triggered
+risk.warning            — approaching a risk limit
 heartbeat               — every 30 seconds`}</Code>
         </Section>
 
@@ -582,6 +585,65 @@ Content-Type: application/json
             </p>
             <p>
               <strong>Fractional shares:</strong> Quantities support up to 6 decimal places.
+            </p>
+          </div>
+        </Section>
+
+        <Section title="Risk Controls">
+          <p className="text-muted-foreground mb-3">
+            Configurable per-user risk limits that evaluate every order before execution.
+          </p>
+
+          <h3 className="font-semibold mb-2">Get Risk Controls & Status</h3>
+          <Code>{`GET /api/v1/trading/risk-controls
+Headers: x-algoarena-cuid
+
+# Returns current controls + live status (daily trades, P&L, drawdown, etc.)`}</Code>
+
+          <h3 className="font-semibold mb-2 mt-4">Update Risk Controls</h3>
+          <Code>{`PUT /api/v1/trading/risk-controls
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+// Apply a preset profile:
+{ "profile": "conservative" }
+
+// Or set individual limits:
+{ "maxPositionPct": "0.15", "maxDailyTrades": 20, "shortSellingEnabled": false }
+
+// Profiles: conservative, moderate, aggressive, unrestricted
+// Set a field to null to remove the limit`}</Code>
+
+          <h3 className="font-semibold mb-2 mt-4">Risk Events</h3>
+          <Code>{`GET /api/v1/trading/risk-controls/events?limit=50&offset=0
+Headers: x-algoarena-cuid`}</Code>
+
+          <h3 className="font-semibold mb-2 mt-4">Default Limits</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>Max position concentration: 25% of equity</p>
+            <p>Max open positions: 50</p>
+            <p>Max price deviation: 10% from market</p>
+            <p>Max daily trades: 100</p>
+            <p>Max short exposure: 50% of equity</p>
+            <p>Max single short: 15% of equity</p>
+          </div>
+
+          <h3 className="font-semibold mb-2">Auto-Flatten</h3>
+          <p className="text-muted-foreground text-sm">
+            When <code>autoFlattenOnLoss</code> is enabled, breaching the daily loss or drawdown limit will
+            automatically cancel all pending orders and close all positions.
+          </p>
+
+          <h3 className="font-semibold mb-2 mt-4">WebSocket Events</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>
+              <code>risk.order_rejected</code> — order rejected by risk controls
+            </p>
+            <p>
+              <code>risk.loss_limit</code> — loss/drawdown limit triggered
+            </p>
+            <p>
+              <code>risk.warning</code> — approaching a risk limit
             </p>
           </div>
         </Section>

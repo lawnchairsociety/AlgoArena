@@ -80,3 +80,11 @@ export const MIN_DAYS_FOR_RATIOS = 5; // min days for Sharpe/beta
 export const WS_HEARTBEAT_INTERVAL_MS = 30_000;
 export const WS_MAX_CONNECTIONS_PER_CUID = 5;
 export const WS_PATH = '/api/v1/ws';
+
+// ── Risk Controls ──
+
+export const RISK_EVENT_TYPES = ['order_rejected', 'warning', 'auto_flatten'] as const;
+export type RiskEventType = (typeof RISK_EVENT_TYPES)[number];
+
+export const RISK_PROFILES = ['conservative', 'moderate', 'aggressive', 'unrestricted'] as const;
+export type RiskProfile = (typeof RISK_PROFILES)[number];

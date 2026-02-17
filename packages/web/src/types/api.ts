@@ -346,3 +346,55 @@ export interface EnhancedTradesResponse {
     offset: number;
   };
 }
+
+// ── Risk Controls ──
+
+export interface RiskControls {
+  maxPositionPct: string | null;
+  maxPositionValue: string | null;
+  maxPositions: number | null;
+  maxOrderValue: string | null;
+  maxOrderQuantity: string | null;
+  maxPriceDeviationPct: string | null;
+  maxDailyTrades: number | null;
+  maxDailyNotional: string | null;
+  maxDailyLossPct: string | null;
+  maxDrawdownPct: string | null;
+  autoFlattenOnLoss: boolean;
+  shortSellingEnabled: boolean;
+  maxShortExposurePct: string | null;
+  maxSingleShortPct: string | null;
+}
+
+export interface RiskStatus {
+  dailyTradeCount: number;
+  dailyNotional: string;
+  dailyPnl: string;
+  dailyPnlPct: string;
+  currentDrawdown: string;
+  shortExposurePct: string;
+  largestPositionPct: string;
+  positionCount: number;
+  isRestricted: boolean;
+  restrictionReason: string | null;
+}
+
+export interface RiskControlsResponse {
+  userId: string;
+  controls: RiskControls;
+  status: RiskStatus;
+}
+
+export interface RiskEvent {
+  id: string;
+  timestamp: string;
+  type: string;
+  control: string;
+  message: string;
+  details: Record<string, unknown>;
+  orderId: string | null;
+}
+
+export interface RiskEventsResponse {
+  events: RiskEvent[];
+}

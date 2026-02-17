@@ -1,5 +1,5 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import * as request from 'supertest';
+import request from 'supertest';
 import { closeTestApp, createTestApp } from './setup';
 
 describe('Auth (e2e)', () => {
@@ -26,10 +26,10 @@ describe('Auth (e2e)', () => {
       .expect(201);
 
     expect(res.body).toHaveProperty('id');
-    expect(res.body).toHaveProperty('key');
+    expect(res.body).toHaveProperty('rawKey');
     expect(res.body.label).toBe('e2e-test');
     _apiKeyId = res.body.id;
-    apiKey = res.body.key;
+    apiKey = res.body.rawKey;
   });
 
   it('POST /api/v1/auth/api-keys — reject invalid master key', async () => {
@@ -37,7 +37,7 @@ describe('Auth (e2e)', () => {
       .post('/api/v1/auth/api-keys')
       .set('x-master-key', 'invalid-key')
       .send({})
-      .expect(401);
+      .expect(403);
   });
 
   it('POST /api/v1/auth/users — create CUID user', async () => {
@@ -47,9 +47,9 @@ describe('Auth (e2e)', () => {
       .send({ label: 'e2e-user', startingBalance: '100000' })
       .expect(201);
 
-    expect(res.body).toHaveProperty('cuid');
+    expect(res.body).toHaveProperty('id');
     expect(res.body.label).toBe('e2e-user');
-    userCuid = res.body.cuid;
+    userCuid = res.body.id;
   });
 
   it('POST /api/v1/auth/users — reject invalid body', async () => {
@@ -68,7 +68,7 @@ describe('Auth (e2e)', () => {
       .set('x-algoarena-cuid', userCuid)
       .expect(200);
 
-    expect(res.body.cuid).toBe(userCuid);
+    expect(res.body.id).toBe(userCuid);
   });
 
   it('GET /api/v1/auth/users — list users', async () => {
@@ -86,9 +86,9 @@ describe('Auth (e2e)', () => {
       .post(`/api/v1/auth/users/${userCuid}/reset`)
       .set('x-algoarena-api-key', apiKey)
       .send({ startingBalance: '50000' })
-      .expect(200);
+      .expect(201);
 
-    expect(res.body).toHaveProperty('cuid');
+    expect(res.body).toHaveProperty('id');
   });
 
   it('DELETE /api/v1/auth/api-keys/:id — revoke key', async () => {
@@ -101,7 +101,7 @@ describe('Auth (e2e)', () => {
 
     await request(app.getHttpServer())
       .delete(`/api/v1/auth/api-keys/${create.body.id}`)
-      .set('x-algoarena-api-key', create.body.key)
+      .set('x-master-key', masterKey)
       .expect(204);
   });
 });

@@ -40,6 +40,9 @@ export const WS_EVENT_TYPES = [
   'pdt.restricted',
   'option.expired',
   'market.session',
+  'risk.order_rejected',
+  'risk.loss_limit',
+  'risk.warning',
   'heartbeat',
 ] as const;
 

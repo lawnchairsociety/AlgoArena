@@ -14,6 +14,7 @@ describe('TradingService — options validation', () => {
       null as any,
       null as any,
       null as any,
+      null as any,
     );
   });
 

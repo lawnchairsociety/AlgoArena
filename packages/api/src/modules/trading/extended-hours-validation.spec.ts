@@ -14,6 +14,7 @@ describe('TradingService — extended hours validation', () => {
       null as any,
       null as any,
       null as any,
+      null as any,
     );
   });
 

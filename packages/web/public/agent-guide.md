@@ -564,6 +564,9 @@ margin.warning          — approaching maintenance margin breach
 margin.liquidation      — positions liquidated
 pdt.warning             — approaching PDT limit
 pdt.restricted          — PDT restriction applied
+risk.order_rejected     — order rejected by risk controls
+risk.loss_limit         — loss/drawdown limit triggered
+risk.warning            — approaching a risk limit
 heartbeat               — every 30 seconds
 ```
 
@@ -639,6 +642,105 @@ Sessions: `pre_market`, `regular`, `after_hours`, `closed`.
 - **Short selling:** Supported with 50% initial margin, 25% maintenance margin, and tiered borrow fees.
 - **Bracket orders (OTO/OCO):** Attach `bracket.takeProfit` and/or `bracket.stopLoss` to any order (except trailing_stop). Children are created on full fill and linked as OCO — when one fills, the other is cancelled.
 - **Fractional shares:** Quantities support up to 6 decimal places.
+
+## Risk Controls
+
+Configurable per-user risk limits that evaluate every order before execution.
+
+### Get Risk Controls & Status
+
+```
+GET /api/v1/trading/risk-controls
+Headers: x-algoarena-cuid
+
+Response:
+{
+  "userId": "YOUR_CUID",
+  "controls": {
+    "maxPositionPct": "0.2500",
+    "maxPositionValue": null,
+    "maxPositions": 50,
+    "maxOrderValue": null,
+    "maxOrderQuantity": null,
+    "maxPriceDeviationPct": "0.1000",
+    "maxDailyTrades": 100,
+    "maxDailyNotional": null,
+    "maxDailyLossPct": null,
+    "maxDrawdownPct": null,
+    "autoFlattenOnLoss": false,
+    "shortSellingEnabled": true,
+    "maxShortExposurePct": "0.5000",
+    "maxSingleShortPct": "0.1500"
+  },
+  "status": {
+    "dailyTradeCount": 5,
+    "dailyNotional": "15000.00",
+    "dailyPnl": "-200.00",
+    "dailyPnlPct": "-0.002000",
+    "currentDrawdown": "-0.010000",
+    "shortExposurePct": "0.050000",
+    "largestPositionPct": "0.150000",
+    "positionCount": 3,
+    "isRestricted": false,
+    "restrictionReason": null
+  }
+}
+```
+
+### Update Risk Controls
+
+```
+PUT /api/v1/trading/risk-controls
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+// Apply a preset profile:
+{ "profile": "conservative" }
+
+// Or set individual limits:
+{
+  "maxPositionPct": "0.15",
+  "maxDailyTrades": 20,
+  "shortSellingEnabled": false
+}
+
+// Profiles: conservative, moderate, aggressive, unrestricted
+// Set a field to null to remove the limit
+```
+
+### Risk Events
+
+```
+GET /api/v1/trading/risk-controls/events?limit=50&offset=0
+Headers: x-algoarena-cuid
+```
+
+### Risk Control Fields
+
+| Field | Default | Description |
+|---|---|---|
+| maxPositionPct | 0.25 | Max position as % of equity |
+| maxPositionValue | null | Max position value in dollars |
+| maxPositions | 50 | Max number of open positions |
+| maxOrderValue | null | Max single order value |
+| maxOrderQuantity | null | Max single order quantity |
+| maxPriceDeviationPct | 0.10 | Max limit/stop price deviation from market |
+| maxDailyTrades | 100 | Max trades per day |
+| maxDailyNotional | null | Max daily notional volume |
+| maxDailyLossPct | null | Max daily loss as % of starting balance |
+| maxDrawdownPct | null | Max drawdown from peak equity |
+| autoFlattenOnLoss | false | Auto-close all positions on loss/drawdown breach |
+| shortSellingEnabled | true | Whether short selling is allowed |
+| maxShortExposurePct | 0.50 | Max total short exposure as % of equity |
+| maxSingleShortPct | 0.15 | Max single short position as % of equity |
+
+### WebSocket Events
+
+```
+risk.order_rejected  — order rejected by risk controls (includes violations array)
+risk.loss_limit      — loss/drawdown limit triggered (includes action: auto_flatten or warning)
+risk.warning         — approaching a risk limit
+```
 
 ## Stats
 

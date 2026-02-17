@@ -1,5 +1,5 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import * as request from 'supertest';
+import request from 'supertest';
 import { closeTestApp, createTestApp } from './setup';
 
 describe('Crypto Trading (e2e)', () => {
@@ -17,13 +17,13 @@ describe('Crypto Trading (e2e)', () => {
       .post('/api/v1/auth/api-keys')
       .set('x-master-key', masterKey)
       .send({ label: 'crypto-e2e' });
-    apiKey = keyRes.body.key;
+    apiKey = keyRes.body.rawKey;
 
     const userRes = await request(app.getHttpServer())
       .post('/api/v1/auth/users')
       .set('x-algoarena-api-key', apiKey)
       .send({ label: 'crypto-user', startingBalance: '100000' });
-    userCuid = userRes.body.cuid;
+    userCuid = userRes.body.id;
   });
 
   afterAll(async () => {
