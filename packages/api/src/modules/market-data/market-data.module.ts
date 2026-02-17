@@ -4,6 +4,7 @@ import { AlpacaClientService } from './alpaca-client.service';
 import { MarketDataController } from './market-data.controller';
 import { MarketDataProvider } from './market-data.provider';
 import { MarketDataService } from './market-data.service';
+import { SessionService } from './session.service';
 
 // biome-ignore lint/suspicious/noExplicitAny: generic constructor type for provider registry
 const PROVIDERS: Record<string, new (...args: any[]) => MarketDataProvider> = {
@@ -28,7 +29,8 @@ const PROVIDERS: Record<string, new (...args: any[]) => MarketDataProvider> = {
       inject: [ConfigService],
     },
     MarketDataService,
+    SessionService,
   ],
-  exports: [MarketDataProvider, MarketDataService],
+  exports: [MarketDataProvider, MarketDataService, SessionService],
 })
 export class MarketDataModule {}

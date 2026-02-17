@@ -453,11 +453,59 @@ order.cancelled         — order cancelled
 order.rejected          — order rejected
 order.expired           — order expired (day orders at close)
 option.expired          — option expired (ITM auto-closed or OTM worthless)
+market.session          — session change (pre_market, regular, after_hours, closed)
 margin.warning          — approaching maintenance margin breach
 margin.liquidation      — positions liquidated
 pdt.warning             — approaching PDT limit
 pdt.restricted          — PDT restriction applied
 heartbeat               — every 30 seconds`}</Code>
+        </Section>
+
+        <Section title="Extended Hours Trading">
+          <p className="text-muted-foreground mb-3">
+            AlgoArena supports pre-market (4:00 AM - 9:30 AM ET) and after-hours (4:00 PM - 8:00 PM ET) trading via the{' '}
+            <code>extendedHours</code> flag on orders.
+          </p>
+
+          <h3 className="font-semibold mb-2">How to Use</h3>
+          <Code>{`POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "AAPL",
+  "side": "buy",
+  "type": "limit",
+  "quantity": "10",
+  "limitPrice": "150.00",
+  "timeInForce": "day",
+  "extendedHours": true
+}`}</Code>
+
+          <h3 className="font-semibold mb-2">Rules</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>
+              <strong>Limit orders only</strong> — market, stop, stop_limit, trailing_stop not allowed
+            </p>
+            <p>
+              <strong>Time in force:</strong> <code>day</code> or <code>gtc</code> only (no <code>ioc</code>/
+              <code>fok</code>)
+            </p>
+            <p>No brackets — cannot combine with bracket orders</p>
+            <p>Not for crypto (trades 24/7) or options (no extended sessions)</p>
+            <p>
+              Day orders with <code>extendedHours: true</code> expire at 8:00 PM ET instead of 4:00 PM
+            </p>
+            <p>
+              Default is <code>false</code> — existing behavior unchanged when omitted
+            </p>
+          </div>
+
+          <h3 className="font-semibold mb-2">Clock Endpoint</h3>
+          <p className="text-muted-foreground mb-2">The market clock now returns session info:</p>
+          <Code>{`GET /api/v1/market/clock
+# Response includes: session, sessions.preMarket, sessions.regular, sessions.afterHours
+# Sessions: pre_market | regular | after_hours | closed`}</Code>
         </Section>
 
         <Section title="Order Execution Rules">
@@ -483,7 +531,8 @@ heartbeat               — every 30 seconds`}</Code>
               <strong>FOK (Fill or Kill):</strong> Evaluated once at placement. Rejected if not fully fillable.
             </p>
             <p>
-              <strong>Day orders:</strong> Automatically expired at 4:00 PM ET.
+              <strong>Day orders:</strong> Automatically expired at 4:00 PM ET (or 8:00 PM ET with{' '}
+              <code>extendedHours: true</code>).
             </p>
             <p>
               <strong>Short selling:</strong> Supported with 50% initial margin, 25% maintenance margin, and tiered

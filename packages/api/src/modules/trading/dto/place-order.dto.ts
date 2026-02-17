@@ -2,6 +2,7 @@ import { ORDER_SIDES, ORDER_TYPES, OrderSide, OrderType, TIME_IN_FORCE_VALUES, T
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsNumberString,
@@ -103,4 +104,8 @@ export class PlaceOrderDto {
   @IsOptional()
   @IsIn(['simple', 'multileg'])
   orderClass?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  extendedHours?: boolean;
 }

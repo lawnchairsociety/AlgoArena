@@ -1,4 +1,11 @@
-import { isCryptoSymbol, isOptionSymbol, OPTIONS_MULTIPLIER, OrderSide, OrderType } from '@algoarena/shared';
+import {
+  isCryptoSymbol,
+  isOptionSymbol,
+  MarketSession,
+  OPTIONS_MULTIPLIER,
+  OrderSide,
+  OrderType,
+} from '@algoarena/shared';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -18,7 +25,7 @@ export class PriceMonitorService {
     private readonly orderEngine: OrderEngineService,
   ) {}
 
-  async evaluatePendingOrders(marketIsOpen = true): Promise<void> {
+  async evaluatePendingOrders(currentSession: MarketSession = 'regular'): Promise<void> {
     const pendingOrders = await this.drizzle.db
       .select()
       .from(orders)
@@ -31,10 +38,13 @@ export class PriceMonitorService {
 
     if (pendingOrders.length === 0) return;
 
-    // Filter: always evaluate crypto, equity + options only when market is open
+    // Filter: always evaluate crypto; extended hours orders in pre/regular/after; regular-only orders only in regular
     const ordersToEvaluate = pendingOrders.filter((o) => {
       if (isCryptoSymbol(o.symbol)) return true;
-      return marketIsOpen; // equity and options both follow equity hours
+      if (o.extendedHours) {
+        return ['pre_market', 'regular', 'after_hours'].includes(currentSession);
+      }
+      return currentSession === 'regular';
     });
 
     if (ordersToEvaluate.length === 0) return;

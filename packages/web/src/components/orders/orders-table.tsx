@@ -78,6 +78,11 @@ export function OrdersTable({ orders, isLoading, selectedOrderId, onSelectOrder 
                           {order.bracketRole === 'entry' ? 'bracket' : order.bracketRole.replace('_', ' ')}
                         </Badge>
                       )}
+                      {order.extendedHours && (
+                        <Badge variant="outline" className="ml-1 text-[10px]">
+                          EXT
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs uppercase hidden lg:table-cell">{order.timeInForce}</TableCell>
                     <TableCell className="text-right font-mono">{formatQuantity(order.quantity)}</TableCell>

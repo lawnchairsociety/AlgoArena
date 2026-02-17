@@ -1,4 +1,4 @@
-import { numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { cuidUsers } from './cuid-users';
 import { orderSideEnum, orderStatusEnum, orderTypeEnum, timeInForceEnum } from './enums';
 
@@ -31,6 +31,7 @@ export const orders = pgTable('orders', {
   // Multi-leg option order grouping
   orderClass: text('order_class'), // 'simple' | 'multileg'
   legGroupId: uuid('leg_group_id'), // shared across legs of a multi-leg order
+  extendedHours: boolean('extended_hours').notNull().default(false),
   avgFillPrice: numeric('avg_fill_price', { precision: 14, scale: 4 }),
   status: orderStatusEnum('status').notNull().default('pending'),
   rejectionReason: text('rejection_reason'),

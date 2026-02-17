@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "extended_hours" boolean DEFAULT false NOT NULL;

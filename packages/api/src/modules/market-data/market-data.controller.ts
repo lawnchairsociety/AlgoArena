@@ -4,6 +4,7 @@ import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiSecurity, ApiTags } f
 import { Throttle } from '@nestjs/throttler';
 import { CuidGuard } from '../../common/guards/cuid.guard';
 import { MarketDataService } from './market-data.service';
+import { SessionService } from './session.service';
 
 @ApiTags('Market Data')
 @Controller('market')
@@ -11,7 +12,10 @@ import { MarketDataService } from './market-data.service';
 @ApiSecurity('cuid')
 @Throttle({ default: { ttl: 60000, limit: 120 } })
 export class MarketDataController {
-  constructor(private readonly marketData: MarketDataService) {}
+  constructor(
+    private readonly marketData: MarketDataService,
+    private readonly sessionService: SessionService,
+  ) {}
 
   @Get('quotes')
   @ApiOperation({ summary: 'Get quotes for multiple symbols' })
@@ -124,7 +128,7 @@ export class MarketDataController {
     if (assetClass === 'crypto') {
       return { timestamp: new Date().toISOString(), isOpen: true, nextOpen: null, nextClose: null };
     }
-    return this.marketData.getClock();
+    return this.sessionService.getSessionDetail();
   }
 
   @Get('assets')

@@ -491,12 +491,73 @@ order.cancelled         — order cancelled
 order.rejected          — order rejected
 order.expired           — order expired (day orders at close)
 option.expired          — option expired (ITM auto-closed or OTM worthless)
+market.session          — session change (pre_market, regular, after_hours, closed)
 margin.warning          — approaching maintenance margin breach
 margin.liquidation      — positions liquidated
 pdt.warning             — approaching PDT limit
 pdt.restricted          — PDT restriction applied
 heartbeat               — every 30 seconds
 ```
+
+## Extended Hours Trading
+
+AlgoArena supports pre-market (4:00 AM - 9:30 AM ET) and after-hours (4:00 PM - 8:00 PM ET) trading via the `extendedHours` flag on orders.
+
+### How to Use
+
+Add `"extendedHours": true` to your order request:
+
+```
+POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "AAPL",
+  "side": "buy",
+  "type": "limit",
+  "quantity": "10",
+  "limitPrice": "150.00",
+  "timeInForce": "day",
+  "extendedHours": true
+}
+```
+
+### Rules
+
+- **Limit orders only** — market, stop, stop_limit, and trailing_stop are not allowed
+- **Time in force**: `day` or `gtc` only (no `ioc`/`fok`)
+- **No brackets** — cannot combine with bracket orders
+- **No trailing stops** — cannot combine with trail parameters
+- **Not for crypto** — crypto trades 24/7, no extended hours needed
+- **Not for options** — options don't have extended hours sessions
+- **Day order expiration**: Extended hours day orders expire at 8:00 PM ET (instead of 4:00 PM)
+- **Default is false** — existing behavior is unchanged when omitted
+
+### Clock Endpoint
+
+The market clock endpoint returns session information:
+
+```
+GET /api/v1/market/clock
+Headers: x-algoarena-cuid
+
+Response:
+{
+  "timestamp": "...",
+  "isOpen": false,
+  "session": "after_hours",
+  "nextOpen": "...",
+  "nextClose": "...",
+  "sessions": {
+    "preMarket": { "start": "04:00", "end": "09:30" },
+    "regular": { "start": "09:30", "end": "16:00" },
+    "afterHours": { "start": "16:00", "end": "20:00" }
+  }
+}
+```
+
+Sessions: `pre_market`, `regular`, `after_hours`, `closed`.
 
 ## Order Execution Rules
 
@@ -506,7 +567,7 @@ heartbeat               — every 30 seconds
 - **Trailing stop orders:** Sell-side only. HWM tracked server-side, evaluated every 60 seconds. Triggers when bid drops to or below the trailing stop price.
 - **IOC (Immediate or Cancel):** Evaluated once at placement. Cancelled if not fillable.
 - **FOK (Fill or Kill):** Evaluated once at placement. Rejected if not fully fillable.
-- **Day orders:** Automatically expired at 4:00 PM ET.
+- **Day orders:** Automatically expired at 4:00 PM ET (or 8:00 PM ET with `extendedHours: true`).
 - **Short selling:** Supported with 50% initial margin, 25% maintenance margin, and tiered borrow fees.
 - **Bracket orders (OTO/OCO):** Attach `bracket.takeProfit` and/or `bracket.stopLoss` to any order (except trailing_stop). Children are created on full fill and linked as OCO — when one fills, the other is cancelled.
 - **Fractional shares:** Quantities support up to 6 decimal places.

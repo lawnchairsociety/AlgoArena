@@ -39,6 +39,7 @@ export const WS_EVENT_TYPES = [
   'pdt.warning',
   'pdt.restricted',
   'option.expired',
+  'market.session',
   'heartbeat',
 ] as const;
 
@@ -48,6 +49,16 @@ export type WsEventType = (typeof WS_EVENT_TYPES)[number];
 
 export const OPTIONS_ALLOWED_ORDER_TYPES = ['market', 'limit'] as const;
 export const OPTIONS_ALLOWED_TIF = ['day', 'gtc'] as const;
+
+// ── Market sessions ──
+
+export const MARKET_SESSIONS = ['pre_market', 'regular', 'after_hours', 'closed'] as const;
+export type MarketSession = (typeof MARKET_SESSIONS)[number];
+
+// ── Extended hours allowed values ──
+
+export const EXTENDED_HOURS_ALLOWED_ORDER_TYPES = ['limit'] as const;
+export const EXTENDED_HOURS_ALLOWED_TIF = ['day', 'gtc'] as const;
 
 export interface WsEventEnvelope<T = unknown> {
   type: WsEventType;

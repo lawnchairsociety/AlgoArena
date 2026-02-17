@@ -7,7 +7,15 @@ describe('TradingService', () => {
 
   beforeEach(() => {
     // validateOrderDto is pure — no injected deps used
-    service = new TradingService(null as any, null as any, null as any, null as any, null as any, null as any);
+    service = new TradingService(
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+    );
   });
 
   const validate = (dto: Partial<PlaceOrderDto>) => (service as any).validateOrderDto(dto as PlaceOrderDto);

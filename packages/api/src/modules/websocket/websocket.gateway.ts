@@ -9,6 +9,7 @@ import { WsAuthService } from './ws-auth.service';
 import {
   MarginLiquidationPayload,
   MarginWarningPayload,
+  MarketSessionPayload,
   OptionExpiredPayload,
   OrderEventPayload,
   PdtRestrictedPayload,
@@ -149,6 +150,11 @@ export class AlgoArenaGateway implements OnGatewayInit, OnGatewayConnection, OnG
     this.sendToUser(payload.cuidUserId, 'option.expired', payload);
   }
 
+  @OnEvent('market.session')
+  handleMarketSession(payload: MarketSessionPayload): void {
+    this.broadcastToAll('market.session', payload);
+  }
+
   // ── Helpers ──
 
   private sendToUser(cuidUserId: string, type: WsEventType, data: object & { cuidUserId: string }): void {
@@ -167,6 +173,24 @@ export class AlgoArenaGateway implements OnGatewayInit, OnGatewayConnection, OnG
     for (const ws of connections) {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(message);
+      }
+    }
+  }
+
+  private broadcastToAll(type: WsEventType, data: object): void {
+    const envelope: WsEventEnvelope = {
+      type,
+      timestamp: new Date().toISOString(),
+      data,
+    };
+    const message = JSON.stringify(envelope);
+
+    const allConnections = this.registry.getAllConnections();
+    for (const [, sockets] of allConnections) {
+      for (const ws of sockets) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(message);
+        }
       }
     }
   }
