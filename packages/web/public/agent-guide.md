@@ -404,14 +404,82 @@ Headers: x-algoarena-cuid
 GET /api/v1/portfolio/positions/:symbol
 Headers: x-algoarena-cuid
 
-# Portfolio value history (snapshots)
-GET /api/v1/portfolio/history?days=30
+# Portfolio value history (wrapped with drawdown)
+GET /api/v1/portfolio/history?period=30d
+Headers: x-algoarena-cuid
+# Periods: 7d, 30d, 90d, ytd, 1y, all
+# Response: { period, interval: "1d", snapshots: [{ date, equity, cash, positionsValue, dayPnl, totalPnl, drawdown }] }
+
+# Enhanced trade history (with FIFO round-trip matching)
+GET /api/v1/portfolio/trades?limit=50&offset=0&symbol=AAPL&side=buy&startDate=2026-01-01&endDate=2026-02-01
+Headers: x-algoarena-cuid
+# Response: { trades: [{ id, orderId, symbol, side, quantity, price, total, timestamp, roundTrip }], pagination: { total, limit, offset } }
+# roundTrip (on closing fills): { entryPrice, exitPrice, pnl, returnPct, holdingDays }
+```
+
+## Portfolio Analytics
+
+```
+# Full portfolio analytics (Sharpe, drawdown, win rate, benchmark comparison)
+GET /api/v1/portfolio/analytics?period=all&benchmark=SPY
 Headers: x-algoarena-cuid
 
-# Trade history (closed round-trips)
-GET /api/v1/portfolio/trades?limit=50&offset=0&symbol=AAPL
-Headers: x-algoarena-cuid
+# Periods: 7d, 30d, 90d, ytd, 1y, all (default: all)
+# Benchmark: any 1-5 letter symbol (default: SPY)
 ```
+
+Response structure:
+
+```json
+{
+  "period": "all",
+  "startDate": "2026-01-01",
+  "endDate": "2026-02-16",
+  "startingEquity": "100000.00",
+  "endingEquity": "105000.00",
+  "returns": {
+    "totalReturn": "0.0500",
+    "annualizedReturn": "0.1200",
+    "dailyReturns": { "mean": "0.000200", "stdDev": "0.010000", "min": "-0.030000", "max": "0.025000", "positive": 15, "negative": 10, "flat": 2 }
+  },
+  "risk": {
+    "sharpeRatio": 1.25,
+    "sortinoRatio": 1.80,
+    "maxDrawdown": "-0.0500",
+    "maxDrawdownDuration": 5,
+    "currentDrawdown": "-0.0100",
+    "volatility": "0.1587",
+    "beta": 0.85,
+    "alpha": 0.0200,
+    "calmarRatio": 2.40,
+    "valueAtRisk95": "-0.016000"
+  },
+  "benchmark": {
+    "symbol": "SPY",
+    "totalReturn": "0.0300",
+    "sharpeRatio": 0.90,
+    "maxDrawdown": "-0.0400",
+    "correlation": 0.75
+  },
+  "trading": {
+    "totalTrades": 25,
+    "winRate": "0.6000",
+    "avgWin": "500.00",
+    "avgLoss": "-200.00",
+    "profitFactor": "1.50",
+    "avgHoldingPeriod": "3.5",
+    "largestWin": "2000.00",
+    "largestLoss": "-800.00",
+    "expectancy": "180.00"
+  }
+}
+```
+
+Notes:
+- Risk ratios (Sharpe, Sortino, beta, alpha, Calmar, VaR95) require at least 5 days of data — returns `null` if insufficient
+- Benchmark section returns `null` if benchmark data is unavailable
+- Trading metrics are based on FIFO round-trip matching from fills
+- Analytics are cached for 5 minutes, history for 60 seconds
 
 ## Market Data
 

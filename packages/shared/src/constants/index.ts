@@ -67,6 +67,14 @@ export const CACHE_TTL_OPTION_QUOTES = 5; // 5 seconds
 export const OPTIONS_NAKED_UNDERLYING_PCT = 0.2; // 20% of underlying
 export const OPTIONS_NAKED_MIN_PCT = 0.1; // min 10% of underlying
 
+// ── Analytics ──
+
+export const CACHE_TTL_ANALYTICS = 300; // 5 minutes
+export const CACHE_TTL_HISTORY = 60; // 60 seconds
+export const RISK_FREE_RATE = 0.05; // 5% annual
+export const TRADING_DAYS_PER_YEAR = 252;
+export const MIN_DAYS_FOR_RATIOS = 5; // min days for Sharpe/beta
+
 // ── WebSocket ──
 
 export const WS_HEARTBEAT_INTERVAL_MS = 30_000;
