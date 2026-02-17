@@ -59,6 +59,14 @@ export const CRYPTO_ASSET_CLASS = 'crypto';
 export const CRYPTO_ALLOWED_ORDER_TYPES = ['market', 'limit', 'stop_limit', 'trailing_stop'] as const;
 export const CRYPTO_ALLOWED_TIF = ['gtc', 'ioc'] as const;
 
+// ── Options ──
+
+export const OPTIONS_MULTIPLIER = 100;
+export const CACHE_TTL_OPTION_CHAIN = 30; // 30 seconds
+export const CACHE_TTL_OPTION_QUOTES = 5; // 5 seconds
+export const OPTIONS_NAKED_UNDERLYING_PCT = 0.2; // 20% of underlying
+export const OPTIONS_NAKED_MIN_PCT = 0.1; // min 10% of underlying
+
 // ── WebSocket ──
 
 export const WS_HEARTBEAT_INTERVAL_MS = 30_000;

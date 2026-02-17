@@ -9,6 +9,7 @@ import { WsAuthService } from './ws-auth.service';
 import {
   MarginLiquidationPayload,
   MarginWarningPayload,
+  OptionExpiredPayload,
   OrderEventPayload,
   PdtRestrictedPayload,
   PdtWarningPayload,
@@ -141,6 +142,11 @@ export class AlgoArenaGateway implements OnGatewayInit, OnGatewayConnection, OnG
   @OnEvent('pdt.restricted')
   handlePdtRestricted(payload: PdtRestrictedPayload): void {
     this.sendToUser(payload.cuidUserId, 'pdt.restricted', payload);
+  }
+
+  @OnEvent('option.expired')
+  handleOptionExpired(payload: OptionExpiredPayload): void {
+    this.sendToUser(payload.cuidUserId, 'option.expired', payload);
   }
 
   // ── Helpers ──

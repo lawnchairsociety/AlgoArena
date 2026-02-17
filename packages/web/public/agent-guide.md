@@ -283,6 +283,112 @@ Both orders must be for the same symbol. When one fills, the other is automatica
 
 For crypto brackets, `stopLoss` requires `limitPrice` (stop_limit). Bare stop orders are not supported for crypto assets.
 
+## Options Trading
+
+AlgoArena supports options trading alongside equities and crypto. Options use OCC symbol format and follow equity market hours.
+
+### Symbol Format
+
+Options use the OCC symbology: `AAPL260320C00230000`
+- `AAPL` — underlying symbol (1-6 chars)
+- `260320` — expiration date (YYMMDD)
+- `C` — call (`C`) or put (`P`)
+- `00230000` — strike price * 1000 (e.g. 230.00 = 00230000)
+
+### Options Market Data
+
+```
+# Get option chain for an underlying
+GET /api/v1/market/options/chain/AAPL
+GET /api/v1/market/options/chain/AAPL?expiration=2026-03-20&type=call
+Headers: x-algoarena-cuid
+
+# Get available expiration dates
+GET /api/v1/market/options/expirations/AAPL
+Headers: x-algoarena-cuid
+
+# Get quote for a specific option contract
+GET /api/v1/market/options/quotes/AAPL260320C00230000
+Headers: x-algoarena-cuid
+```
+
+### Supported Order Types
+
+- `market` — fills immediately during market hours
+- `limit` — evaluated every 60 seconds during market hours
+
+**Not supported for options:** `stop`, `stop_limit`, `trailing_stop`.
+
+### Supported Time In Force
+
+- `day` — expires at market close
+- `gtc` — good until cancelled or expiration
+
+**Not supported for options:** `ioc`, `fok`.
+
+### Key Rules
+
+- **Whole contracts only** — no fractional quantities
+- **No short selling** — sell side is long-close only (no naked writing in v1)
+- **No PDT rules** — pattern day trader restrictions do not apply to options
+- **Multiplier = 100** — cash impact = price * quantity * 100
+- **No brackets** — bracket orders not supported for options
+- **No trailing stops** — trailing stop parameters not supported for options
+
+### Example: Buy a Call Option
+
+```
+POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "AAPL260320C00230000",
+  "side": "buy",
+  "type": "market",
+  "quantity": "1",
+  "timeInForce": "day"
+}
+```
+
+Cash deducted: ask price * 1 * 100 (e.g. if ask = $5.20, cost = $520).
+
+### Multi-Leg Orders
+
+Place 2-4 option legs atomically as one order. All legs must share the same underlying and expiration.
+
+```
+POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "AAPL260320C00230000",
+  "side": "buy",
+  "type": "market",
+  "quantity": "1",
+  "timeInForce": "day",
+  "orderClass": "multileg",
+  "legs": [
+    { "symbol": "AAPL260320C00230000", "side": "buy", "quantity": "1", "type": "market" },
+    { "symbol": "AAPL260320C00240000", "side": "sell", "quantity": "1", "type": "market" }
+  ]
+}
+```
+
+Rules:
+- All legs must be valid OCC option symbols
+- All legs must share the same underlying and expiration
+- 2-4 legs allowed
+- All-or-nothing: either all legs fill or none
+
+### Expiration Handling
+
+- **ITM options** auto-close at intrinsic value at 4:01 PM ET on expiration day
+- **OTM options** expire worthless (position deleted)
+- Pending option orders for expiring contracts are expired at the same time
+- WebSocket event `option.expired` is emitted for each expired position
+
 ## Portfolio
 
 ```
@@ -384,6 +490,7 @@ order.partially_filled  — partial fill
 order.cancelled         — order cancelled
 order.rejected          — order rejected
 order.expired           — order expired (day orders at close)
+option.expired          — option expired (ITM auto-closed or OTM worthless)
 margin.warning          — approaching maintenance margin breach
 margin.liquidation      — positions liquidated
 pdt.warning             — approaching PDT limit

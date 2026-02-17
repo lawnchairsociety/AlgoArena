@@ -11,5 +11,11 @@ export const positions = pgTable('positions', {
   quantity: numeric('quantity', { precision: 14, scale: 6 }).notNull(),
   avgCostBasis: numeric('avg_cost_basis', { precision: 14, scale: 4 }).notNull(),
   totalCostBasis: numeric('total_cost_basis', { precision: 14, scale: 2 }).notNull(),
+  // Option metadata (nullable — only set for option positions)
+  optionType: text('option_type'), // 'call' | 'put'
+  strikePrice: numeric('strike_price', { precision: 12, scale: 4 }),
+  expiration: text('expiration'), // 'YYYY-MM-DD'
+  underlyingSymbol: text('underlying_symbol'),
+  multiplier: numeric('multiplier', { precision: 6, scale: 0 }).default('1'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

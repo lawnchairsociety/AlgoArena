@@ -28,6 +28,9 @@ export const orders = pgTable('orders', {
   takeProfitLimitPrice: numeric('take_profit_limit_price', { precision: 14, scale: 4 }),
   stopLossStopPrice: numeric('stop_loss_stop_price', { precision: 14, scale: 4 }),
   stopLossLimitPrice: numeric('stop_loss_limit_price', { precision: 14, scale: 4 }),
+  // Multi-leg option order grouping
+  orderClass: text('order_class'), // 'simple' | 'multileg'
+  legGroupId: uuid('leg_group_id'), // shared across legs of a multi-leg order
   avgFillPrice: numeric('avg_fill_price', { precision: 14, scale: 4 }),
   status: orderStatusEnum('status').notNull().default('pending'),
   rejectionReason: text('rejection_reason'),

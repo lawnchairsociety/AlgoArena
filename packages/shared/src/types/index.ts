@@ -1,6 +1,6 @@
 // ── Asset classes ──
 
-export const ASSET_CLASSES = ['us_equity', 'crypto'] as const;
+export const ASSET_CLASSES = ['us_equity', 'crypto', 'option'] as const;
 export type AssetClass = (typeof ASSET_CLASSES)[number];
 
 // ── Enum value arrays (single source of truth for TS types + Drizzle pgEnums) ──
@@ -38,10 +38,16 @@ export const WS_EVENT_TYPES = [
   'margin.liquidation',
   'pdt.warning',
   'pdt.restricted',
+  'option.expired',
   'heartbeat',
 ] as const;
 
 export type WsEventType = (typeof WS_EVENT_TYPES)[number];
+
+// ── Options-specific allowed values ──
+
+export const OPTIONS_ALLOWED_ORDER_TYPES = ['market', 'limit'] as const;
+export const OPTIONS_ALLOWED_TIF = ['day', 'gtc'] as const;
 
 export interface WsEventEnvelope<T = unknown> {
   type: WsEventType;

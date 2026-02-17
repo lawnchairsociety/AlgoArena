@@ -290,6 +290,75 @@ Content-Type: application/json
           </p>
         </Section>
 
+        <Section title="Options Trading">
+          <p className="text-muted-foreground mb-3">
+            AlgoArena supports options trading alongside equities and crypto. Options use OCC symbol format and follow
+            equity market hours.
+          </p>
+
+          <h3 className="font-semibold mb-2">Symbol Format (OCC)</h3>
+          <p className="text-muted-foreground mb-3">
+            <code>AAPL260320C00230000</code> = AAPL, 2026-03-20, Call, $230.00 strike
+          </p>
+
+          <h3 className="font-semibold mb-2">Options Market Data</h3>
+          <Code>{`# Option chain
+GET /api/v1/market/options/chain/AAPL?expiration=2026-03-20&type=call
+
+# Expiration dates
+GET /api/v1/market/options/expirations/AAPL
+
+# Option quote
+GET /api/v1/market/options/quotes/AAPL260320C00230000`}</Code>
+
+          <h3 className="font-semibold mb-2">Rules</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>
+              <strong>Order types:</strong> market, limit only (NOT stop, stop_limit, trailing_stop)
+            </p>
+            <p>
+              <strong>Time in force:</strong> day, gtc only (NOT ioc, fok)
+            </p>
+            <p>Whole contracts only — no fractional quantities</p>
+            <p>Multiplier = 100 — cash impact = price * qty * 100</p>
+            <p>No short selling, no brackets, no trailing stops</p>
+          </div>
+
+          <h3 className="font-semibold mb-2">Example: Buy a Call</h3>
+          <Code>{`POST /api/v1/trading/orders
+{
+  "symbol": "AAPL260320C00230000",
+  "side": "buy",
+  "type": "market",
+  "quantity": "1",
+  "timeInForce": "day"
+}`}</Code>
+
+          <h3 className="font-semibold mb-2">Multi-Leg Orders</h3>
+          <Code>{`POST /api/v1/trading/orders
+{
+  "symbol": "AAPL260320C00230000",
+  "side": "buy",
+  "type": "market",
+  "quantity": "1",
+  "timeInForce": "day",
+  "orderClass": "multileg",
+  "legs": [
+    { "symbol": "AAPL260320C00230000", "side": "buy", "quantity": "1", "type": "market" },
+    { "symbol": "AAPL260320C00240000", "side": "sell", "quantity": "1", "type": "market" }
+  ]
+}`}</Code>
+          <p className="text-muted-foreground text-sm mt-2">
+            2-4 legs allowed. All legs must share the same underlying and expiration. All-or-nothing execution.
+          </p>
+
+          <h3 className="font-semibold mb-2 mt-4">Expiration</h3>
+          <p className="text-muted-foreground text-sm">
+            ITM options auto-close at intrinsic value at 4:01 PM ET. OTM options expire worthless. WebSocket event:{' '}
+            <code>option.expired</code>.
+          </p>
+        </Section>
+
         <Section title="Portfolio">
           <Code>{`# Account summary (cash, equity, P&L, PDT status)
 GET /api/v1/portfolio/account
@@ -383,6 +452,7 @@ order.partially_filled  — partial fill
 order.cancelled         — order cancelled
 order.rejected          — order rejected
 order.expired           — order expired (day orders at close)
+option.expired          — option expired (ITM auto-closed or OTM worthless)
 margin.warning          — approaching maintenance margin breach
 margin.liquidation      — positions liquidated
 pdt.warning             — approaching PDT limit

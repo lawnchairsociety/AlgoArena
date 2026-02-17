@@ -34,6 +34,15 @@ export function OrderDetailPanel({ orderId, onClose }: { orderId: string; onClos
     { label: 'Created', value: formatDateTime(order.createdAt) },
   ];
 
+  if (order.assetClass === 'option') {
+    details.push({ label: 'Asset Class', value: 'Option' });
+  }
+  if (order.orderClass === 'multileg') {
+    details.push({ label: 'Order Class', value: 'Multi-Leg' });
+  }
+  if (order.legGroupId) {
+    details.push({ label: 'Leg Group', value: `${order.legGroupId.slice(0, 8)}...` });
+  }
   if (order.bracketRole) {
     details.push({ label: 'Bracket Role', value: order.bracketRole.replace('_', ' ') });
   }

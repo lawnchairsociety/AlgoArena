@@ -79,3 +79,55 @@ export interface CalendarDay {
   sessionOpen: string;
   sessionClose: string;
 }
+
+// ── Options ──
+
+export interface OptionGreeks {
+  delta: number;
+  gamma: number;
+  theta: number;
+  vega: number;
+  rho: number;
+}
+
+export interface OptionContract {
+  symbol: string;
+  underlying: string;
+  type: 'call' | 'put';
+  strike: string;
+  expiration: string;
+  status: string;
+  tradable: boolean;
+  multiplier: number;
+  style: string;
+  openInterest: number;
+  greeks: OptionGreeks | null;
+  quote: {
+    bid: string;
+    ask: string;
+    last: string;
+    volume: number;
+    impliedVolatility: number | null;
+  } | null;
+}
+
+export interface OptionChainResponse {
+  underlying: string;
+  expirations: string[];
+  contracts: OptionContract[];
+}
+
+export interface OptionQuote {
+  symbol: string;
+  bid: string;
+  ask: string;
+  last: string;
+  volume: number;
+  openInterest: number;
+  impliedVolatility: number | null;
+  greeks: OptionGreeks | null;
+  underlying: {
+    symbol: string;
+    price: string;
+  };
+}

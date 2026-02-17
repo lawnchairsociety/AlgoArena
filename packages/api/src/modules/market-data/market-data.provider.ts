@@ -4,6 +4,8 @@ import {
   CalendarDay,
   MarketClock,
   MultiBarsResponse,
+  OptionChainResponse,
+  OptionQuote,
   Quote,
   Snapshot,
 } from './types/market-data-provider.types';
@@ -50,4 +52,16 @@ export abstract class MarketDataProvider {
 
   /** Get the market calendar. */
   abstract getCalendar(params?: { start?: string; end?: string }): Promise<CalendarDay[]>;
+
+  /** Get the option chain for an underlying symbol. */
+  abstract getOptionChain(
+    underlying: string,
+    params?: { expiration?: string; type?: string; strike_price_gte?: string; strike_price_lte?: string },
+  ): Promise<OptionChainResponse>;
+
+  /** Get option quotes/snapshots for one or more OCC symbols. */
+  abstract getOptionQuotes(symbols: string[]): Promise<Record<string, OptionQuote>>;
+
+  /** Get available expiration dates for an underlying symbol. */
+  abstract getOptionExpirations(underlying: string): Promise<string[]>;
 }

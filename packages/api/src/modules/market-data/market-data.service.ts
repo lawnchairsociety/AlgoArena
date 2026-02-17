@@ -3,6 +3,8 @@ import {
   CACHE_TTL_BARS,
   CACHE_TTL_CALENDAR,
   CACHE_TTL_CLOCK,
+  CACHE_TTL_OPTION_CHAIN,
+  CACHE_TTL_OPTION_QUOTES,
   CACHE_TTL_QUOTES,
   CACHE_TTL_SNAPSHOTS,
   isCryptoSymbol,
@@ -17,6 +19,8 @@ import {
   CalendarDay,
   MarketClock,
   MultiBarsResponse,
+  OptionChainResponse,
+  OptionQuote,
   Quote,
   Snapshot,
 } from './types/market-data-provider.types';
@@ -173,6 +177,55 @@ export class MarketDataService {
     const calendar = await this.provider.getCalendar(params);
     await this.cache.set(key, calendar, CACHE_TTL_CALENDAR);
     return calendar;
+  }
+
+  // ── Options ──
+
+  async getOptionChain(
+    underlying: string,
+    params?: { expiration?: string; type?: string; strike_price_gte?: string; strike_price_lte?: string },
+  ): Promise<OptionChainResponse> {
+    const key = `options:chain:${underlying.toUpperCase()}:${JSON.stringify(params ?? {})}`;
+    const cached = await this.cache.get<OptionChainResponse>(key);
+    if (cached) return cached;
+
+    const chain = await this.provider.getOptionChain(underlying, params);
+    await this.cache.set(key, chain, CACHE_TTL_OPTION_CHAIN);
+    return chain;
+  }
+
+  async getOptionQuotes(symbols: string[]): Promise<Record<string, OptionQuote>> {
+    const result: Record<string, OptionQuote> = {};
+    const uncached: string[] = [];
+
+    for (const sym of symbols) {
+      const cached = await this.cache.get<OptionQuote>(`options:quote:${sym}`);
+      if (cached) {
+        result[sym] = cached;
+      } else {
+        uncached.push(sym);
+      }
+    }
+
+    if (uncached.length > 0) {
+      const fresh = await this.provider.getOptionQuotes(uncached);
+      for (const [sym, quote] of Object.entries(fresh)) {
+        result[sym] = quote;
+        await this.cache.set(`options:quote:${sym}`, quote, CACHE_TTL_OPTION_QUOTES);
+      }
+    }
+
+    return result;
+  }
+
+  async getOptionExpirations(underlying: string): Promise<string[]> {
+    const key = `options:expirations:${underlying.toUpperCase()}`;
+    const cached = await this.cache.get<string[]>(key);
+    if (cached) return cached;
+
+    const expirations = await this.provider.getOptionExpirations(underlying);
+    await this.cache.set(key, expirations, CACHE_TTL_OPTION_CHAIN);
+    return expirations;
   }
 
   // ── Private Helpers ──

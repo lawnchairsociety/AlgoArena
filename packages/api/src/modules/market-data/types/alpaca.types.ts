@@ -111,6 +111,66 @@ export interface AlpacaCryptoSnapshotResponse {
   snapshots: Record<string, AlpacaSnapshot>;
 }
 
+// ── Options ──
+
+export interface AlpacaOptionContract {
+  id: string;
+  symbol: string;
+  name: string;
+  status: string;
+  tradable: boolean;
+  expiration_date: string;
+  root_symbol: string;
+  underlying_symbol: string;
+  underlying_asset_id: string;
+  type: 'call' | 'put';
+  style: string;
+  strike_price: string;
+  multiplier: string;
+  size: string;
+  open_interest: string;
+  open_interest_date: string;
+  close_price: string;
+  close_price_date: string;
+}
+
+export interface AlpacaOptionContractsResponse {
+  option_contracts: AlpacaOptionContract[];
+  next_page_token: string | null;
+}
+
+export interface AlpacaOptionSnapshot {
+  latestQuote: {
+    t: string;
+    ax: string;
+    ap: number;
+    as: number;
+    bx: string;
+    bp: number;
+    bs: number;
+    c: string;
+  };
+  latestTrade: {
+    t: string;
+    x: string;
+    p: number;
+    s: number;
+    c: string;
+  };
+  impliedVolatility: number | null;
+  greeks: {
+    delta: number;
+    gamma: number;
+    theta: number;
+    vega: number;
+    rho: number;
+  } | null;
+}
+
+export interface AlpacaOptionSnapshotsResponse {
+  snapshots: Record<string, AlpacaOptionSnapshot>;
+}
+
 // ── Calendar ──
 
 export interface AlpacaCalendarDay {

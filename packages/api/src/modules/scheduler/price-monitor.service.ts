@@ -1,4 +1,4 @@
-import { isCryptoSymbol, OrderSide, OrderType } from '@algoarena/shared';
+import { isCryptoSymbol, isOptionSymbol, OPTIONS_MULTIPLIER, OrderSide, OrderType } from '@algoarena/shared';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -31,59 +31,120 @@ export class PriceMonitorService {
 
     if (pendingOrders.length === 0) return;
 
-    // Filter: always evaluate crypto, equity only when market is open
+    // Filter: always evaluate crypto, equity + options only when market is open
     const ordersToEvaluate = pendingOrders.filter((o) => {
       if (isCryptoSymbol(o.symbol)) return true;
-      return marketIsOpen;
+      return marketIsOpen; // equity and options both follow equity hours
     });
 
     if (ordersToEvaluate.length === 0) return;
 
-    const symbols = [...new Set(ordersToEvaluate.map((o) => o.symbol))];
-    const quotes = await this.marketDataService.getQuotes(symbols);
+    // Partition option orders from equity/crypto
+    const optionOrders = ordersToEvaluate.filter((o) => isOptionSymbol(o.symbol));
+    const nonOptionOrders = ordersToEvaluate.filter((o) => !isOptionSymbol(o.symbol));
 
     let evaluated = 0;
     let filled = 0;
 
-    for (const order of ordersToEvaluate) {
-      try {
-        const quote = quotes[order.symbol];
-        if (!quote) continue;
+    // Evaluate non-option orders with equity/crypto quotes
+    if (nonOptionOrders.length > 0) {
+      const symbols = [...new Set(nonOptionOrders.map((o) => o.symbol))];
+      const quotes = await this.marketDataService.getQuotes(symbols);
 
-        if (order.type === 'trailing_stop') {
-          await this.evaluateTrailingStop(order, quote);
+      for (const order of nonOptionOrders) {
+        try {
+          const quote = quotes[order.symbol];
+          if (!quote) continue;
+
+          if (order.type === 'trailing_stop') {
+            await this.evaluateTrailingStop(order, quote);
+            evaluated++;
+            continue;
+          }
+
+          const fillPrice = this.orderEngine.evaluateOrderConditions(
+            order.type as OrderType,
+            order.side as OrderSide,
+            quote,
+            order.limitPrice,
+            order.stopPrice,
+          );
+
           evaluated++;
-          continue;
+
+          if (fillPrice) {
+            const fillQuantity = new Decimal(order.quantity).minus(new Decimal(order.filledQuantity));
+
+            await this.orderEngine.executeFill({
+              orderId: order.id,
+              fillPrice,
+              fillQuantity,
+            });
+
+            filled++;
+            this.logger.log(`Filled ${order.type} order ${order.id} for ${order.symbol} @ ${fillPrice.toFixed(4)}`);
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (error instanceof BadRequestException) {
+            await this.rejectOrder(order.id, message);
+          } else {
+            this.logger.error(`Error evaluating order ${order.id}: ${message}`);
+          }
         }
+      }
+    }
 
-        const fillPrice = this.orderEngine.evaluateOrderConditions(
-          order.type as OrderType,
-          order.side as OrderSide,
-          quote,
-          order.limitPrice,
-          order.stopPrice,
-        );
+    // Evaluate option orders with option quotes
+    if (optionOrders.length > 0) {
+      const optionSymbols = [...new Set(optionOrders.map((o) => o.symbol))];
+      const optionQuotes = await this.marketDataService.getOptionQuotes(optionSymbols);
 
-        evaluated++;
+      for (const order of optionOrders) {
+        try {
+          const oq = optionQuotes[order.symbol];
+          if (!oq) continue;
 
-        if (fillPrice) {
-          const fillQuantity = new Decimal(order.quantity).minus(new Decimal(order.filledQuantity));
+          const quote: Quote = {
+            timestamp: new Date().toISOString(),
+            askPrice: parseFloat(oq.ask),
+            askSize: 0,
+            bidPrice: parseFloat(oq.bid),
+            bidSize: 0,
+          };
 
-          await this.orderEngine.executeFill({
-            orderId: order.id,
-            fillPrice,
-            fillQuantity,
-          });
+          const fillPrice = this.orderEngine.evaluateOrderConditions(
+            order.type as OrderType,
+            order.side as OrderSide,
+            quote,
+            order.limitPrice,
+            order.stopPrice,
+          );
 
-          filled++;
-          this.logger.log(`Filled ${order.type} order ${order.id} for ${order.symbol} @ ${fillPrice.toFixed(4)}`);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (error instanceof BadRequestException) {
-          await this.rejectOrder(order.id, message);
-        } else {
-          this.logger.error(`Error evaluating order ${order.id}: ${message}`);
+          evaluated++;
+
+          if (fillPrice) {
+            const fillQuantity = new Decimal(order.quantity).minus(new Decimal(order.filledQuantity));
+
+            await this.orderEngine.executeFill({
+              orderId: order.id,
+              fillPrice,
+              fillQuantity,
+              multiplier: OPTIONS_MULTIPLIER,
+            });
+
+            filled++;
+            this.logger.log(
+              `Filled option ${order.type} order ${order.id} for ${order.symbol} @ ${fillPrice.toFixed(4)}`,
+            );
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (error instanceof BadRequestException) {
+            await this.rejectOrder(order.id, message);
+          } else {
+            this.logger.error(`Error evaluating option order ${order.id}: ${message}`);
+          }
         }
       }
     }

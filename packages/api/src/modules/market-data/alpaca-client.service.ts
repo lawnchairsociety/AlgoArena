@@ -1,4 +1,4 @@
-import { ALPACA_DATA_BASE_URL, isCryptoSymbol, normalizeCryptoSymbol } from '@algoarena/shared';
+import { ALPACA_DATA_BASE_URL, isCryptoSymbol, normalizeCryptoSymbol, parseOptionSymbol } from '@algoarena/shared';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MarketDataProvider } from './market-data.provider';
@@ -13,6 +13,10 @@ import {
   AlpacaCryptoSnapshotResponse,
   AlpacaMultiBarsResponse,
   AlpacaMultiQuoteResponse,
+  AlpacaOptionContract,
+  AlpacaOptionContractsResponse,
+  AlpacaOptionSnapshot,
+  AlpacaOptionSnapshotsResponse,
   AlpacaQuote,
   AlpacaQuoteResponse,
   AlpacaSnapshot,
@@ -24,6 +28,9 @@ import {
   CalendarDay,
   MarketClock,
   MultiBarsResponse,
+  OptionChainResponse,
+  OptionContract,
+  OptionQuote,
   Quote,
   Snapshot,
 } from './types/market-data-provider.types';
@@ -233,6 +240,175 @@ export class AlpacaClientService extends MarketDataProvider {
     }));
   }
 
+  // ── Options ──
+
+  async getOptionChain(
+    underlying: string,
+    params?: { expiration?: string; type?: string; strike_price_gte?: string; strike_price_lte?: string },
+  ): Promise<OptionChainResponse> {
+    const upper = underlying.toUpperCase();
+
+    // Fetch contracts from trading API with pagination
+    const allContracts: AlpacaOptionContract[] = [];
+    let pageToken: string | null = null;
+
+    do {
+      const queryParams: Record<string, string | number | undefined> = {
+        underlying_symbols: upper,
+        status: 'active',
+        limit: 100,
+        ...(params?.expiration ? { expiration_date: params.expiration } : {}),
+        ...(params?.type ? { type: params.type } : {}),
+        ...(params?.strike_price_gte ? { strike_price_gte: params.strike_price_gte } : {}),
+        ...(params?.strike_price_lte ? { strike_price_lte: params.strike_price_lte } : {}),
+        ...(pageToken ? { page_token: pageToken } : {}),
+      };
+
+      const res = await this.tradingRequest<AlpacaOptionContractsResponse>('/v2/options/contracts', queryParams);
+      allContracts.push(...(res.option_contracts || []));
+      pageToken = res.next_page_token;
+    } while (pageToken);
+
+    if (allContracts.length === 0) {
+      return { underlying: upper, expirations: [], contracts: [] };
+    }
+
+    // Batch-fetch snapshots for greeks/quotes (max 100 symbols per request)
+    const snapshotMap: Record<string, AlpacaOptionSnapshot> = {};
+    const contractSymbols = allContracts.map((c) => c.symbol);
+
+    for (let i = 0; i < contractSymbols.length; i += 100) {
+      const batch = contractSymbols.slice(i, i + 100);
+      try {
+        const snapRes = await this.optionsDataRequest<AlpacaOptionSnapshotsResponse>('/v1beta1/options/snapshots', {
+          symbols: batch.join(','),
+        });
+        for (const [sym, snap] of Object.entries(snapRes.snapshots || {})) {
+          snapshotMap[sym] = snap;
+        }
+      } catch {
+        this.logger.warn(`Failed to fetch option snapshots for batch starting at index ${i}`);
+      }
+    }
+
+    // Build canonical contracts
+    const contracts: OptionContract[] = allContracts.map((c) => {
+      const snap = snapshotMap[c.symbol];
+      return {
+        symbol: c.symbol,
+        underlying: c.underlying_symbol,
+        type: c.type,
+        strike: c.strike_price,
+        expiration: c.expiration_date,
+        status: c.status,
+        tradable: c.tradable,
+        multiplier: parseInt(c.multiplier, 10) || 100,
+        style: c.style,
+        openInterest: parseInt(c.open_interest, 10) || 0,
+        greeks: snap?.greeks ?? null,
+        quote: snap
+          ? {
+              bid: String(snap.latestQuote?.bp ?? 0),
+              ask: String(snap.latestQuote?.ap ?? 0),
+              last: String(snap.latestTrade?.p ?? 0),
+              volume: snap.latestTrade?.s ?? 0,
+              impliedVolatility: snap.impliedVolatility,
+            }
+          : null,
+      };
+    });
+
+    const expirations = [...new Set(contracts.map((c) => c.expiration))].sort();
+
+    return { underlying: upper, expirations, contracts };
+  }
+
+  async getOptionQuotes(symbols: string[]): Promise<Record<string, OptionQuote>> {
+    if (symbols.length === 0) return {};
+
+    const result: Record<string, OptionQuote> = {};
+
+    // Fetch option snapshots in batches of 100
+    const allSnapshots: Record<string, AlpacaOptionSnapshot> = {};
+    for (let i = 0; i < symbols.length; i += 100) {
+      const batch = symbols.slice(i, i + 100);
+      const res = await this.optionsDataRequest<AlpacaOptionSnapshotsResponse>('/v1beta1/options/snapshots', {
+        symbols: batch.join(','),
+      });
+      for (const [sym, snap] of Object.entries(res.snapshots || {})) {
+        allSnapshots[sym] = snap;
+      }
+    }
+
+    // Fetch underlying equity quotes for price context
+    const underlyings = new Set<string>();
+    for (const sym of symbols) {
+      const parsed = parseOptionSymbol(sym);
+      if (parsed) underlyings.add(parsed.underlying);
+    }
+    const underlyingQuotes: Record<string, Quote> = {};
+    if (underlyings.size > 0) {
+      try {
+        const uQuotes = await this.getLatestQuotes([...underlyings]);
+        for (const [sym, q] of Object.entries(uQuotes)) {
+          underlyingQuotes[sym] = q;
+        }
+      } catch {
+        this.logger.warn('Failed to fetch underlying quotes for option quotes');
+      }
+    }
+
+    for (const sym of symbols) {
+      const snap = allSnapshots[sym];
+      if (!snap) continue;
+
+      const parsed = parseOptionSymbol(sym);
+      const underlyingSymbol = parsed?.underlying ?? '';
+      const underlyingQuote = underlyingQuotes[underlyingSymbol];
+
+      result[sym] = {
+        symbol: sym,
+        bid: String(snap.latestQuote?.bp ?? 0),
+        ask: String(snap.latestQuote?.ap ?? 0),
+        last: String(snap.latestTrade?.p ?? 0),
+        volume: snap.latestTrade?.s ?? 0,
+        openInterest: 0,
+        impliedVolatility: snap.impliedVolatility,
+        greeks: snap.greeks,
+        underlying: {
+          symbol: underlyingSymbol,
+          price: underlyingQuote ? String(underlyingQuote.bidPrice) : '0',
+        },
+      };
+    }
+
+    return result;
+  }
+
+  async getOptionExpirations(underlying: string): Promise<string[]> {
+    const upper = underlying.toUpperCase();
+
+    const allExpirations = new Set<string>();
+    let pageToken: string | null = null;
+
+    do {
+      const queryParams: Record<string, string | number | undefined> = {
+        underlying_symbols: upper,
+        status: 'active',
+        limit: 100,
+        ...(pageToken ? { page_token: pageToken } : {}),
+      };
+
+      const res = await this.tradingRequest<AlpacaOptionContractsResponse>('/v2/options/contracts', queryParams);
+      for (const c of res.option_contracts || []) {
+        allExpirations.add(c.expiration_date);
+      }
+      pageToken = res.next_page_token;
+    } while (pageToken);
+
+    return [...allExpirations].sort();
+  }
+
   // ── Alpaca → Canonical Mappers ──
 
   private mapQuote(q: AlpacaQuote): Quote {
@@ -294,6 +470,10 @@ export class AlpacaClientService extends MarketDataProvider {
   }
 
   // ── Private HTTP Helpers ──
+
+  private async optionsDataRequest<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+    return this.request<T>(ALPACA_DATA_BASE_URL, path, params);
+  }
 
   private async cryptoDataRequest<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
     return this.request<T>(ALPACA_DATA_BASE_URL, path, params);
