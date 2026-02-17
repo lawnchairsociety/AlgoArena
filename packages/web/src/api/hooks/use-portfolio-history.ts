@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
-import type { PortfolioSnapshot } from '@/types/api';
+import type { AnalyticsPeriod, HistoryResponse } from '@/types/api';
 
-export function usePortfolioHistory(days = 30) {
+export function usePortfolioHistory(period: AnalyticsPeriod = '30d') {
   return useQuery({
-    queryKey: ['portfolio-history', days],
+    queryKey: ['portfolio-history', period],
     queryFn: async () => {
-      const { data } = await apiClient.get<PortfolioSnapshot[]>('/portfolio/history', {
-        params: { days },
+      const { data } = await apiClient.get<HistoryResponse>('/portfolio/history', {
+        params: { period },
       });
       return data;
     },

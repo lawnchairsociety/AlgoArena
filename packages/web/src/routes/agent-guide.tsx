@@ -372,13 +372,50 @@ Headers: x-algoarena-cuid
 GET /api/v1/portfolio/positions/:symbol
 Headers: x-algoarena-cuid
 
-# Portfolio value history (snapshots)
-GET /api/v1/portfolio/history?days=30
+# Portfolio value history (wrapped with drawdown)
+GET /api/v1/portfolio/history?period=30d
+Headers: x-algoarena-cuid
+# Periods: 7d, 30d, 90d, ytd, 1y, all
+
+# Enhanced trade history (with FIFO round-trip matching)
+GET /api/v1/portfolio/trades?limit=50&offset=0&symbol=AAPL&side=buy
+Headers: x-algoarena-cuid`}</Code>
+        </Section>
+
+        <Section title="Portfolio Analytics">
+          <p className="text-muted-foreground mb-3">
+            Comprehensive portfolio performance analytics including Sharpe ratio, drawdown, win rate, and benchmark
+            comparison.
+          </p>
+          <Code>{`GET /api/v1/portfolio/analytics?period=all&benchmark=SPY
 Headers: x-algoarena-cuid
 
-# Trade history (closed round-trips)
-GET /api/v1/portfolio/trades?limit=50&offset=0&symbol=AAPL
-Headers: x-algoarena-cuid`}</Code>
+# Periods: 7d, 30d, 90d, ytd, 1y, all (default: all)
+# Benchmark: any 1-5 letter symbol (default: SPY)`}</Code>
+
+          <h3 className="font-semibold mb-2 mt-4">Response Sections</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>
+              <strong>returns</strong> — totalReturn, annualizedReturn, daily return statistics
+            </p>
+            <p>
+              <strong>risk</strong> — Sharpe, Sortino, max drawdown, volatility, beta, alpha, Calmar, VaR95
+            </p>
+            <p>
+              <strong>benchmark</strong> — benchmark total return, Sharpe, max drawdown, correlation (null if
+              unavailable)
+            </p>
+            <p>
+              <strong>trading</strong> — win rate, avg win/loss, profit factor, expectancy, holding period
+            </p>
+          </div>
+
+          <h3 className="font-semibold mb-2">Notes</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>Risk ratios require at least 5 days of data — returns null if insufficient</p>
+            <p>Trading metrics are based on FIFO round-trip matching from fills</p>
+            <p>Analytics cached for 5 minutes, history for 60 seconds</p>
+          </div>
         </Section>
 
         <Section title="Market Data">

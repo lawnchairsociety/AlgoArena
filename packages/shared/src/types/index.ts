@@ -65,3 +65,8 @@ export interface WsEventEnvelope<T = unknown> {
   timestamp: string;
   data: T;
 }
+
+// ── Analytics ──
+
+export const ANALYTICS_PERIODS = ['7d', '30d', '90d', 'ytd', '1y', 'all'] as const;
+export type AnalyticsPeriod = (typeof ANALYTICS_PERIODS)[number];

@@ -6,14 +6,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/format';
 
 export function PnlChart() {
-  const { data: history, isLoading } = usePortfolioHistory(30);
+  const { data: history, isLoading } = usePortfolioHistory('30d');
   const { data: account } = useAccount();
 
   const startingBalance = account ? parseFloat(account.startingBalance) : 100_000;
 
-  const chartData = (history || []).map((s) => ({
-    date: s.snapshotDate,
-    equity: parseFloat(s.totalEquity),
+  const chartData = (history?.snapshots || []).map((s) => ({
+    date: s.date,
+    equity: parseFloat(s.equity),
   }));
 
   return (
