@@ -36,7 +36,7 @@ describe('Market Data (e2e)', () => {
       .set('x-algoarena-cuid', userCuid)
       .expect(200);
 
-    expect(res.body).toHaveProperty('is_open');
+    expect(res.body).toHaveProperty('isOpen');
   });
 
   it('GET /api/v1/market/quotes/:symbol — get quote', async () => {
@@ -45,7 +45,7 @@ describe('Market Data (e2e)', () => {
       .set('x-algoarena-cuid', userCuid)
       .expect(200);
 
-    expect(res.body).toHaveProperty('symbol');
+    expect(res.body).toHaveProperty('askPrice');
   });
 
   it('GET /api/v1/market/quotes — get multiple quotes', async () => {

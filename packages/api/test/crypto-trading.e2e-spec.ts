@@ -24,6 +24,21 @@ describe('Crypto Trading (e2e)', () => {
       .set('x-algoarena-api-key', apiKey)
       .send({ label: 'crypto-user', startingBalance: '100000' });
     userCuid = userRes.body.id;
+
+    // Disable risk controls — these tests need permissive limits
+    await request(app.getHttpServer())
+      .put('/api/v1/trading/risk-controls')
+      .set('x-algoarena-api-key', apiKey)
+      .set('x-algoarena-cuid', userCuid)
+      .send({
+        maxPriceDeviationPct: null,
+        maxOrderValue: null,
+        maxOrderQuantity: null,
+        maxPositionPct: null,
+        maxPositionValue: null,
+        maxShortExposurePct: null,
+        maxSingleShortPct: null,
+      });
   });
 
   afterAll(async () => {
@@ -87,6 +102,7 @@ describe('Crypto Trading (e2e)', () => {
   });
 
   it('should reject crypto short sell', async () => {
+    // Sell more than any existing position to trigger short-sell detection
     const res = await request(app.getHttpServer())
       .post('/api/v1/trading/orders')
       .set('x-algoarena-api-key', apiKey)
@@ -95,7 +111,7 @@ describe('Crypto Trading (e2e)', () => {
         symbol: 'BTC/USD',
         side: 'sell',
         type: 'market',
-        quantity: '0.001',
+        quantity: '999',
         timeInForce: 'gtc',
       })
       .expect(400);
