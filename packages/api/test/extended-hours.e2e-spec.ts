@@ -23,6 +23,13 @@ describe('Extended Hours Trading (e2e)', () => {
       .set('x-algoarena-api-key', apiKey)
       .send({ label: 'ext-hours-user', startingBalance: '100000' });
     userCuid = userRes.body.id;
+
+    // Disable price deviation check — these tests use hardcoded limit prices
+    await request(app.getHttpServer())
+      .put('/api/v1/trading/risk-controls')
+      .set('x-algoarena-api-key', apiKey)
+      .set('x-algoarena-cuid', userCuid)
+      .send({ maxPriceDeviationPct: null });
   });
 
   afterAll(async () => {
