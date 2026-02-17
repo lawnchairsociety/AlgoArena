@@ -40,7 +40,14 @@ export function PositionsTable() {
               <TableBody>
                 {positions.map((pos) => (
                   <TableRow key={pos.id}>
-                    <TableCell className="font-medium">{pos.symbol}</TableCell>
+                    <TableCell className="font-medium">
+                      <div>{pos.symbol}</div>
+                      {pos.assetClass === 'option' && (
+                        <div className="text-xs text-muted-foreground">
+                          {pos.underlyingSymbol} {pos.strikePrice} {pos.optionType} {pos.expiration}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant={pos.side === 'long' ? 'default' : 'destructive'}

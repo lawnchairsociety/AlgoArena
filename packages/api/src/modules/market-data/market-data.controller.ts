@@ -1,3 +1,4 @@
+import { isOptionSymbol } from '@algoarena/shared';
 import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -148,5 +149,55 @@ export class MarketDataController {
       start: start || undefined,
       end: end || undefined,
     });
+  }
+
+  // ── Options ──
+
+  @Get('options/chain/:symbol')
+  @ApiOperation({ summary: 'Get option chain for an underlying symbol' })
+  @ApiParam({ name: 'symbol', description: 'Underlying stock symbol (e.g. AAPL)' })
+  @ApiQuery({ name: 'expiration', description: 'Filter by expiration date (YYYY-MM-DD)', required: false })
+  @ApiQuery({ name: 'type', description: 'Filter by option type (call or put)', required: false })
+  @ApiQuery({ name: 'strike_price_gte', description: 'Minimum strike price', required: false })
+  @ApiQuery({ name: 'strike_price_lte', description: 'Maximum strike price', required: false })
+  @ApiResponse({ status: 200, description: 'Option chain returned' })
+  async getOptionChain(
+    @Param('symbol') symbol: string,
+    @Query('expiration') expiration?: string,
+    @Query('type') type?: string,
+    @Query('strike_price_gte') strikePriceGte?: string,
+    @Query('strike_price_lte') strikePriceLte?: string,
+  ) {
+    return this.marketData.getOptionChain(symbol, {
+      expiration: expiration || undefined,
+      type: type || undefined,
+      strike_price_gte: strikePriceGte || undefined,
+      strike_price_lte: strikePriceLte || undefined,
+    });
+  }
+
+  @Get('options/quotes/:contractSymbol')
+  @ApiOperation({ summary: 'Get quote for an option contract' })
+  @ApiParam({ name: 'contractSymbol', description: 'OCC option symbol (e.g. AAPL260320C00230000)' })
+  @ApiResponse({ status: 200, description: 'Option quote returned' })
+  async getOptionQuote(@Param('contractSymbol') contractSymbol: string) {
+    if (!isOptionSymbol(contractSymbol)) {
+      throw new BadRequestException(`Invalid OCC option symbol: ${contractSymbol}`);
+    }
+    const quotes = await this.marketData.getOptionQuotes([contractSymbol.toUpperCase()]);
+    const quote = quotes[contractSymbol.toUpperCase()];
+    if (!quote) {
+      throw new BadRequestException(`No quote found for ${contractSymbol}`);
+    }
+    return quote;
+  }
+
+  @Get('options/expirations/:symbol')
+  @ApiOperation({ summary: 'Get available expiration dates for an underlying symbol' })
+  @ApiParam({ name: 'symbol', description: 'Underlying stock symbol (e.g. AAPL)' })
+  @ApiResponse({ status: 200, description: 'Expirations returned' })
+  async getOptionExpirations(@Param('symbol') symbol: string) {
+    const expirations = await this.marketData.getOptionExpirations(symbol);
+    return { symbol: symbol.toUpperCase(), expirations };
   }
 }

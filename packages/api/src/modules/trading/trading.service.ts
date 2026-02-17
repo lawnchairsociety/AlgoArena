@@ -4,7 +4,12 @@ import {
   CRYPTO_ALLOWED_TIF,
   INITIAL_MARGIN_REQUIREMENT,
   isCryptoSymbol,
+  isOptionSymbol,
   normalizeCryptoSymbol,
+  OPTIONS_ALLOWED_ORDER_TYPES,
+  OPTIONS_ALLOWED_TIF,
+  OPTIONS_MULTIPLIER,
+  parseOptionSymbol,
 } from '@algoarena/shared';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -15,6 +20,7 @@ import { DrizzleProvider } from '../database/drizzle.provider';
 import { borrowFeeTiers, cuidUsers, fills, orders, positions } from '../database/schema';
 import { MarketDataProvider } from '../market-data/market-data.provider';
 import { MarketDataService } from '../market-data/market-data.service';
+import { Asset, Quote } from '../market-data/types/market-data-provider.types';
 import { OrderEventPayload } from '../websocket/ws-event.types';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
@@ -37,27 +43,58 @@ export class TradingService {
   // ── Public Methods ──
 
   async placeOrder(cuidUserId: string, dto: PlaceOrderDto) {
-    // 0. Crypto detection + normalization
-    const isCrypto = isCryptoSymbol(dto.symbol);
+    // 0a. Multi-leg dispatch
+    if (dto.orderClass === 'multileg' && dto.legs) {
+      return this.placeMultiLegOrder(cuidUserId, dto);
+    }
+
+    // 0b. Asset class detection + normalization
+    const isOption = isOptionSymbol(dto.symbol);
+    const isCrypto = !isOption && isCryptoSymbol(dto.symbol);
     if (isCrypto) dto.symbol = normalizeCryptoSymbol(dto.symbol);
+    if (isOption) dto.symbol = dto.symbol.toUpperCase();
 
     // 1. Validate DTO
     this.validateOrderDto(dto);
 
-    // 2. Crypto-specific constraints
+    // 2. Asset-specific constraints
     if (isCrypto) this.validateCryptoConstraints(dto);
+    if (isOption) this.validateOptionsConstraints(dto);
 
     // 3. Validate symbol
-    const asset = await this.marketDataProvider.getAsset(dto.symbol);
-    if (!asset.tradable) {
-      throw new BadRequestException(`${dto.symbol} is not tradable`);
+    let asset: Asset | null = null;
+    if (!isOption) {
+      asset = await this.marketDataProvider.getAsset(dto.symbol);
+      if (!asset.tradable) {
+        throw new BadRequestException(`${dto.symbol} is not tradable`);
+      }
+    } else {
+      // Validate OCC format for options
+      const parsed = parseOptionSymbol(dto.symbol);
+      if (!parsed) {
+        throw new BadRequestException(`Invalid OCC option symbol: ${dto.symbol}`);
+      }
     }
 
-    // 3. Get quote + clock
-    const [quote, clock] = await Promise.all([
-      this.marketDataService.getQuote(dto.symbol),
-      this.marketDataService.getClock(),
-    ]);
+    // 3b. Get quote + clock
+    let quote: Quote;
+    if (isOption) {
+      const optionQuotes = await this.marketDataService.getOptionQuotes([dto.symbol]);
+      const optionQuote = optionQuotes[dto.symbol];
+      if (!optionQuote) {
+        throw new BadRequestException(`No option quote found for ${dto.symbol}`);
+      }
+      quote = {
+        timestamp: new Date().toISOString(),
+        askPrice: parseFloat(optionQuote.ask),
+        askSize: 0,
+        bidPrice: parseFloat(optionQuote.bid),
+        bidSize: 0,
+      };
+    } else {
+      quote = await this.marketDataService.getQuote(dto.symbol);
+    }
+    const clock = await this.marketDataService.getClock();
 
     // 4. Load fresh user + existing position
     const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, cuidUserId)).limit(1);
@@ -67,6 +104,7 @@ export class TradingService {
     }
 
     const normalizedSymbol = isCrypto ? dto.symbol : dto.symbol.toUpperCase();
+    const effectiveMultiplier = isOption ? OPTIONS_MULTIPLIER : 1;
     const positionId = `${cuidUserId}:${normalizedSymbol}`;
     const [existingPosition] = await this.drizzle.db
       .select()
@@ -87,11 +125,14 @@ export class TradingService {
     }
 
     if (isShortSell) {
+      if (isOption) {
+        throw new BadRequestException('Short selling is not supported for options');
+      }
       if (isCrypto) {
         throw new BadRequestException('Short selling is not supported for crypto');
       }
 
-      if (!asset.shortable) {
+      if (!asset!.shortable) {
         throw new BadRequestException(`${dto.symbol} is not shortable`);
       }
 
@@ -105,7 +146,7 @@ export class TradingService {
       if (tierRecord && tierRecord.tier === 'not_shortable') {
         throw new BadRequestException(`${dto.symbol} is not shortable (borrow tier)`);
       }
-      if (!tierRecord && !asset.shortable) {
+      if (!tierRecord && !asset!.shortable) {
         throw new BadRequestException(`${dto.symbol} is not shortable`);
       }
 
@@ -126,8 +167,8 @@ export class TradingService {
       }
     }
 
-    // 7. PDT check (equities only)
-    if (user.pdtEnforced && !isCrypto) {
+    // 7. PDT check (equities only — skip for crypto and options)
+    if (user.pdtEnforced && !isCrypto && !isOption) {
       const equity = await this.computeEquity(user);
       const pdtError = await this.pdtService.checkPdtRule(cuidUserId, equity);
       if (pdtError) {
@@ -135,32 +176,32 @@ export class TradingService {
       }
     }
 
-    // 8. Buying power check
+    // 8. Buying power check (multiplier-aware for options)
     const askPrice = new Decimal(quote.askPrice);
     const _bidPrice = new Decimal(quote.bidPrice);
     const cash = new Decimal(user.cashBalance);
+    const multipliedCost = askPrice.mul(fillQuantity).mul(effectiveMultiplier);
 
     if (dto.side === 'buy') {
       if (isCover) {
-        // Buy to cover: need cash
-        if (cash.lt(askPrice.mul(fillQuantity))) {
+        if (cash.lt(multipliedCost)) {
           throw new BadRequestException(
-            `Insufficient funds to cover: need $${askPrice.mul(fillQuantity).toFixed(2)}, have $${cash.toFixed(2)}`,
+            `Insufficient funds to cover: need $${multipliedCost.toFixed(2)}, have $${cash.toFixed(2)}`,
           );
         }
       } else {
-        // Buy long
-        if (cash.lt(askPrice.mul(fillQuantity))) {
+        if (cash.lt(multipliedCost)) {
           throw new BadRequestException(
-            `Insufficient funds: need $${askPrice.mul(fillQuantity).toFixed(2)}, have $${cash.toFixed(2)}`,
+            `Insufficient funds: need $${multipliedCost.toFixed(2)}, have $${cash.toFixed(2)}`,
           );
         }
       }
     } else if (!isShortSell) {
       // Sell long: must have sufficient position
       if (currentPositionQty.lt(fillQuantity)) {
+        const unit = isOption ? 'contracts' : 'shares';
         throw new BadRequestException(
-          `Insufficient position: have ${currentPositionQty.toFixed(6)} shares, trying to sell ${fillQuantity.toFixed(6)}`,
+          `Insufficient position: have ${currentPositionQty.toFixed(isOption ? 0 : 6)} ${unit}, trying to sell ${fillQuantity.toFixed(isOption ? 0 : 6)}`,
         );
       }
     }
@@ -171,7 +212,7 @@ export class TradingService {
       .values({
         cuidUserId,
         symbol: normalizedSymbol,
-        assetClass: isCrypto ? 'crypto' : 'us_equity',
+        assetClass: isOption ? 'option' : isCrypto ? 'crypto' : 'us_equity',
         side: dto.side,
         type: dto.type,
         timeInForce: dto.timeInForce,
@@ -244,6 +285,7 @@ export class TradingService {
             orderId: order.id,
             fillPrice,
             fillQuantity,
+            multiplier: effectiveMultiplier,
           });
         } else if (dto.timeInForce === 'ioc' || dto.timeInForce === 'fok') {
           // IOC/FOK + market closed → reject
@@ -270,6 +312,7 @@ export class TradingService {
               orderId: order.id,
               fillPrice,
               fillQuantity,
+              multiplier: effectiveMultiplier,
             });
           } else if (dto.timeInForce === 'fok') {
             // FOK: conditions not met → reject
@@ -315,6 +358,141 @@ export class TradingService {
 
     // Return the latest order state
     return this.getOrderById(order.id, cuidUserId);
+  }
+
+  async placeMultiLegOrder(cuidUserId: string, dto: PlaceOrderDto) {
+    const legs = dto.legs!;
+
+    // 1. Validate leg count
+    if (legs.length < 2 || legs.length > 4) {
+      throw new BadRequestException('Multi-leg orders must have 2-4 legs');
+    }
+
+    // 2. Validate all legs are valid OCC symbols with same underlying and expiration
+    const parsedLegs = legs.map((leg) => {
+      const parsed = parseOptionSymbol(leg.symbol);
+      if (!parsed) {
+        throw new BadRequestException(`Invalid OCC option symbol: ${leg.symbol}`);
+      }
+      return { ...leg, symbol: leg.symbol.toUpperCase(), parsed };
+    });
+
+    const underlying = parsedLegs[0].parsed.underlying;
+    const expiration = parsedLegs[0].parsed.expiration;
+
+    for (const leg of parsedLegs) {
+      if (leg.parsed.underlying !== underlying) {
+        throw new BadRequestException('All legs must share the same underlying symbol');
+      }
+      if (leg.parsed.expiration !== expiration) {
+        throw new BadRequestException('All legs must share the same expiration date');
+      }
+      const qty = new Decimal(leg.quantity);
+      if (!qty.isInteger() || qty.lte(0)) {
+        throw new BadRequestException('All leg quantities must be positive whole numbers');
+      }
+    }
+
+    // 3. Validate no bracket or OCO
+    if (dto.bracket) {
+      throw new BadRequestException('Bracket orders cannot be combined with multi-leg orders');
+    }
+    if (dto.ocoLinkedTo) {
+      throw new BadRequestException('OCO linking cannot be combined with multi-leg orders');
+    }
+
+    // 4. Fetch option quotes for all leg symbols
+    const legSymbols = parsedLegs.map((l) => l.symbol);
+    const optionQuotes = await this.marketDataService.getOptionQuotes(legSymbols);
+
+    for (const leg of parsedLegs) {
+      if (!optionQuotes[leg.symbol]) {
+        throw new BadRequestException(`No option quote found for ${leg.symbol}`);
+      }
+    }
+
+    // 5. Calculate net premium
+    let netPremium = new Decimal(0);
+    for (const leg of parsedLegs) {
+      const oq = optionQuotes[leg.symbol];
+      const qty = new Decimal(leg.quantity);
+      if (leg.side === 'buy') {
+        netPremium = netPremium.plus(new Decimal(oq.ask).mul(qty).mul(OPTIONS_MULTIPLIER));
+      } else {
+        netPremium = netPremium.minus(new Decimal(oq.bid).mul(qty).mul(OPTIONS_MULTIPLIER));
+      }
+    }
+
+    // 6. For limit orders, check net premium against limit price
+    if (dto.type === 'limit' && dto.limitPrice) {
+      const limitNet = new Decimal(dto.limitPrice).mul(OPTIONS_MULTIPLIER);
+      if (netPremium.gt(0) && netPremium.gt(limitNet)) {
+        // Debit spread: net cost exceeds limit
+        // Don't fill yet — leave as pending for price monitor
+      }
+    }
+
+    // 7. Buying power check: need cash for net debit
+    const [user] = await this.drizzle.db.select().from(cuidUsers).where(eq(cuidUsers.id, cuidUserId)).limit(1);
+    if (!user) throw new NotFoundException('User not found');
+
+    const cash = new Decimal(user.cashBalance);
+    if (netPremium.gt(0) && cash.lt(netPremium)) {
+      throw new BadRequestException(
+        `Insufficient funds for multi-leg order: need $${netPremium.toFixed(2)}, have $${cash.toFixed(2)}`,
+      );
+    }
+
+    // 8. Insert orders atomically with shared legGroupId
+    const legGroupId = randomUUID();
+    const clock = await this.marketDataService.getClock();
+    const createdOrders: Array<typeof orders.$inferSelect> = [];
+
+    for (const leg of parsedLegs) {
+      const [order] = await this.drizzle.db
+        .insert(orders)
+        .values({
+          cuidUserId,
+          symbol: leg.symbol,
+          assetClass: 'option',
+          side: leg.side,
+          type: leg.type as 'market' | 'limit',
+          timeInForce: dto.timeInForce,
+          quantity: leg.quantity,
+          limitPrice: dto.limitPrice ?? null,
+          orderClass: 'multileg',
+          legGroupId,
+        })
+        .returning();
+      createdOrders.push(order);
+    }
+
+    // 9. For market orders, fill all legs immediately if market is open
+    if (dto.type === 'market' && clock.isOpen) {
+      for (let i = 0; i < parsedLegs.length; i++) {
+        const leg = parsedLegs[i];
+        const order = createdOrders[i];
+        const oq = optionQuotes[leg.symbol];
+        const fillPrice = leg.side === 'buy' ? new Decimal(oq.ask) : new Decimal(oq.bid);
+        const fillQuantity = new Decimal(leg.quantity);
+
+        await this.orderEngine.executeFill({
+          orderId: order.id,
+          fillPrice,
+          fillQuantity,
+          multiplier: OPTIONS_MULTIPLIER,
+        });
+      }
+    }
+
+    // 10. Return leg group with all child orders
+    const finalOrders = await Promise.all(createdOrders.map((o) => this.getOrderById(o.id, cuidUserId)));
+
+    return {
+      legGroupId,
+      orderClass: 'multileg',
+      legs: finalOrders,
+    };
   }
 
   async cancelOrder(orderId: string, cuidUserId: string) {
@@ -409,6 +587,29 @@ export class TradingService {
     }
 
     return cash.plus(positionsValue);
+  }
+
+  private validateOptionsConstraints(dto: PlaceOrderDto): void {
+    if (!(OPTIONS_ALLOWED_ORDER_TYPES as readonly string[]).includes(dto.type)) {
+      throw new BadRequestException(
+        `Order type '${dto.type}' not supported for options. Allowed: ${OPTIONS_ALLOWED_ORDER_TYPES.join(', ')}`,
+      );
+    }
+    if (!(OPTIONS_ALLOWED_TIF as readonly string[]).includes(dto.timeInForce)) {
+      throw new BadRequestException(
+        `Time in force '${dto.timeInForce}' not supported for options. Allowed: ${OPTIONS_ALLOWED_TIF.join(', ')}`,
+      );
+    }
+    const qty = new Decimal(dto.quantity);
+    if (!qty.isInteger()) {
+      throw new BadRequestException('Options quantity must be a whole number (no fractional contracts)');
+    }
+    if (dto.trailPercent || dto.trailPrice) {
+      throw new BadRequestException('Trailing stop parameters not supported for options');
+    }
+    if (dto.bracket) {
+      throw new BadRequestException('Bracket orders are not supported for options');
+    }
   }
 
   private validateCryptoConstraints(dto: PlaceOrderDto): void {

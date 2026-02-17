@@ -1,4 +1,4 @@
-import { isCryptoSymbol, normalizeCryptoSymbol, PDT_MIN_EQUITY } from '@algoarena/shared';
+import { isCryptoSymbol, isOptionSymbol, normalizeCryptoSymbol, PDT_MIN_EQUITY } from '@algoarena/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { and, desc, eq, gte } from 'drizzle-orm';
@@ -32,19 +32,18 @@ export class PortfolioService {
     let unrealizedPnl = new Decimal(0);
 
     if (userPositions.length > 0) {
-      const symbols = userPositions.map((p) => p.symbol);
-      const quotes = await this.marketDataService.getQuotes(symbols);
+      const quoteMap = await this.fetchQuotesForPositions(userPositions);
 
       for (const pos of userPositions) {
         const qty = new Decimal(pos.quantity);
         const avgCost = new Decimal(pos.avgCostBasis);
-        const quote = quotes[pos.symbol];
+        const multiplier = new Decimal(pos.multiplier ?? '1');
+        const q = quoteMap[pos.symbol];
 
-        if (quote) {
-          // Longs use bid, shorts use ask
-          const price = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
-          positionsValue = positionsValue.plus(qty.mul(price));
-          unrealizedPnl = unrealizedPnl.plus(price.minus(avgCost).mul(qty));
+        if (q) {
+          const price = qty.gt(0) ? new Decimal(q.bidPrice) : new Decimal(q.askPrice);
+          positionsValue = positionsValue.plus(qty.mul(price).mul(multiplier));
+          unrealizedPnl = unrealizedPnl.plus(price.minus(avgCost).mul(qty).mul(multiplier));
         }
       }
     }
@@ -77,23 +76,23 @@ export class PortfolioService {
       return [];
     }
 
-    const symbols = userPositions.map((p) => p.symbol);
-    const quotes = await this.marketDataService.getQuotes(symbols);
+    const quoteMap = await this.fetchQuotesForPositions(userPositions);
 
     return userPositions.map((pos) => {
       const qty = new Decimal(pos.quantity);
       const avgCost = new Decimal(pos.avgCostBasis);
-      const quote = quotes[pos.symbol];
+      const multiplier = new Decimal(pos.multiplier ?? '1');
+      const q = quoteMap[pos.symbol];
       const side = qty.gt(0) ? 'long' : 'short';
 
       let currentPrice = new Decimal(0);
       let marketValue = new Decimal(0);
       let unrealizedPnl = new Decimal(0);
 
-      if (quote) {
-        currentPrice = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
-        marketValue = qty.mul(currentPrice);
-        unrealizedPnl = currentPrice.minus(avgCost).mul(qty);
+      if (q) {
+        currentPrice = qty.gt(0) ? new Decimal(q.bidPrice) : new Decimal(q.askPrice);
+        marketValue = qty.mul(currentPrice).mul(multiplier);
+        unrealizedPnl = currentPrice.minus(avgCost).mul(qty).mul(multiplier);
       }
 
       return {
@@ -115,14 +114,29 @@ export class PortfolioService {
       throw new NotFoundException(`No position found for ${sym}`);
     }
 
-    const quote = await this.marketDataService.getQuote(pos.symbol);
+    let bidPrice: number;
+    let askPrice: number;
+
+    if (isOptionSymbol(pos.symbol)) {
+      const optionQuotes = await this.marketDataService.getOptionQuotes([pos.symbol]);
+      const oq = optionQuotes[pos.symbol];
+      if (!oq) throw new NotFoundException(`No option quote found for ${pos.symbol}`);
+      bidPrice = parseFloat(oq.bid);
+      askPrice = parseFloat(oq.ask);
+    } else {
+      const quote = await this.marketDataService.getQuote(pos.symbol);
+      bidPrice = quote.bidPrice;
+      askPrice = quote.askPrice;
+    }
+
     const qty = new Decimal(pos.quantity);
     const avgCost = new Decimal(pos.avgCostBasis);
+    const multiplier = new Decimal(pos.multiplier ?? '1');
     const side = qty.gt(0) ? 'long' : 'short';
 
-    const currentPrice = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
-    const marketValue = qty.mul(currentPrice);
-    const unrealizedPnl = currentPrice.minus(avgCost).mul(qty);
+    const currentPrice = qty.gt(0) ? new Decimal(bidPrice) : new Decimal(askPrice);
+    const marketValue = qty.mul(currentPrice).mul(multiplier);
+    const unrealizedPnl = currentPrice.minus(avgCost).mul(qty).mul(multiplier);
 
     return {
       ...pos,
@@ -143,6 +157,39 @@ export class PortfolioService {
       .from(portfolioSnapshots)
       .where(and(eq(portfolioSnapshots.cuidUserId, userId), gte(portfolioSnapshots.snapshotDate, startDateStr)))
       .orderBy(portfolioSnapshots.snapshotDate);
+  }
+
+  private async fetchQuotesForPositions(
+    userPositions: Array<typeof positions.$inferSelect>,
+  ): Promise<Record<string, { bidPrice: number; askPrice: number }>> {
+    const equitySymbols: string[] = [];
+    const optionSymbols: string[] = [];
+
+    for (const p of userPositions) {
+      if (isOptionSymbol(p.symbol)) {
+        optionSymbols.push(p.symbol);
+      } else {
+        equitySymbols.push(p.symbol);
+      }
+    }
+
+    const result: Record<string, { bidPrice: number; askPrice: number }> = {};
+
+    if (equitySymbols.length > 0) {
+      const equityQuotes = await this.marketDataService.getQuotes(equitySymbols);
+      for (const [sym, q] of Object.entries(equityQuotes)) {
+        result[sym] = { bidPrice: q.bidPrice, askPrice: q.askPrice };
+      }
+    }
+
+    if (optionSymbols.length > 0) {
+      const optionQuotes = await this.marketDataService.getOptionQuotes(optionSymbols);
+      for (const [sym, q] of Object.entries(optionQuotes)) {
+        result[sym] = { bidPrice: parseFloat(q.bid), askPrice: parseFloat(q.ask) };
+      }
+    }
+
+    return result;
   }
 
   async getTradeHistory(userId: string, query: TradeHistoryQueryDto) {

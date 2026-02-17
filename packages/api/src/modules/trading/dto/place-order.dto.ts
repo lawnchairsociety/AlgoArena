@@ -1,6 +1,15 @@
 import { ORDER_SIDES, ORDER_TYPES, OrderSide, OrderType, TIME_IN_FORCE_VALUES, TimeInForce } from '@algoarena/shared';
 import { Type } from 'class-transformer';
-import { IsIn, IsNotEmpty, IsNumberString, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsIn,
+  IsNotEmpty,
+  IsNumberString,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 
 export class TakeProfitDto {
   @IsNumberString()
@@ -26,6 +35,21 @@ export class BracketDto {
   @ValidateNested()
   @Type(() => StopLossDto)
   stopLoss?: StopLossDto;
+}
+
+export class LegDto {
+  @IsString()
+  @IsNotEmpty()
+  symbol!: string;
+
+  @IsIn([...ORDER_SIDES])
+  side!: OrderSide;
+
+  @IsNumberString()
+  quantity!: string;
+
+  @IsIn(['market', 'limit'])
+  type!: string;
 }
 
 export class PlaceOrderDto {
@@ -69,4 +93,14 @@ export class PlaceOrderDto {
   @IsOptional()
   @IsUUID()
   ocoLinkedTo?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LegDto)
+  legs?: LegDto[];
+
+  @IsOptional()
+  @IsIn(['simple', 'multileg'])
+  orderClass?: string;
 }

@@ -63,6 +63,16 @@ export function OrdersTable({ orders, isLoading, selectedOrderId, onSelectOrder 
                     </TableCell>
                     <TableCell className="text-xs hidden sm:table-cell">
                       {order.type.replace('_', ' ')}
+                      {order.assetClass === 'option' && (
+                        <Badge variant="outline" className="ml-1 text-[10px]">
+                          option
+                        </Badge>
+                      )}
+                      {order.orderClass === 'multileg' && (
+                        <Badge variant="outline" className="ml-1 text-[10px]">
+                          multi-leg
+                        </Badge>
+                      )}
                       {order.bracketRole && (
                         <Badge variant="outline" className="ml-1 text-[10px]">
                           {order.bracketRole === 'entry' ? 'bracket' : order.bracketRole.replace('_', ' ')}

@@ -1,4 +1,10 @@
-import { MAINTENANCE_MARGIN_REQUIREMENT, OrderSide } from '@algoarena/shared';
+import {
+  isOptionSymbol,
+  MAINTENANCE_MARGIN_REQUIREMENT,
+  OPTIONS_MULTIPLIER,
+  OrderSide,
+  parseOptionSymbol,
+} from '@algoarena/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron } from '@nestjs/schedule';
@@ -89,7 +95,7 @@ export class SchedulerService {
           and(
             inArray(orders.status, ['pending', 'partially_filled']),
             eq(orders.timeInForce, 'day'),
-            eq(orders.assetClass, 'us_equity'),
+            inArray(orders.assetClass, ['us_equity', 'option']),
           ),
         )
         .returning({
@@ -141,9 +147,24 @@ export class SchedulerService {
       // Get all positions across all users
       const allPositions = await this.drizzle.db.select().from(positions);
 
-      // Batch-fetch all unique symbols once
+      // Batch-fetch all unique symbols once, partitioning equity/crypto vs options
       const allSymbols = [...new Set(allPositions.map((p) => p.symbol))];
-      const quotes = allSymbols.length > 0 ? await this.marketDataService.getQuotes(allSymbols) : {};
+      const equitySymbols = allSymbols.filter((s) => !isOptionSymbol(s));
+      const optionSymbols = allSymbols.filter((s) => isOptionSymbol(s));
+
+      const quoteMap: Record<string, { bidPrice: number; askPrice: number }> = {};
+      if (equitySymbols.length > 0) {
+        const eq = await this.marketDataService.getQuotes(equitySymbols);
+        for (const [sym, q] of Object.entries(eq)) {
+          quoteMap[sym] = { bidPrice: q.bidPrice, askPrice: q.askPrice };
+        }
+      }
+      if (optionSymbols.length > 0) {
+        const oq = await this.marketDataService.getOptionQuotes(optionSymbols);
+        for (const [sym, q] of Object.entries(oq)) {
+          quoteMap[sym] = { bidPrice: parseFloat(q.bid), askPrice: parseFloat(q.ask) };
+        }
+      }
 
       const snapshots: Array<typeof portfolioSnapshots.$inferInsert> = [];
 
@@ -155,10 +176,11 @@ export class SchedulerService {
         let positionsValue = new Decimal(0);
         for (const pos of userPositions) {
           const qty = new Decimal(pos.quantity);
-          const quote = quotes[pos.symbol];
+          const multiplier = new Decimal(pos.multiplier ?? '1');
+          const quote = quoteMap[pos.symbol];
           if (quote) {
             const price = qty.gt(0) ? new Decimal(quote.bidPrice) : new Decimal(quote.askPrice);
-            positionsValue = positionsValue.plus(qty.mul(price));
+            positionsValue = positionsValue.plus(qty.mul(price).mul(multiplier));
           }
         }
 
@@ -317,6 +339,112 @@ export class SchedulerService {
       this.logger.error(`Margin check error: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.unlock('marginCheck');
+    }
+  }
+
+  // ── Option Expirations: 4:01 PM ET, Mon-Fri ──
+
+  @Cron('0 1 16 * * 1-5', { timeZone: 'America/New_York' })
+  async handleOptionExpirations(): Promise<void> {
+    if (this.isLocked('optionExpirations')) return;
+
+    try {
+      this.lock('optionExpirations');
+      if (!(await this.isTradingDay())) return;
+
+      this.logger.log('Processing option expirations');
+      const todayET = this.getTodayET();
+
+      // Expire pending option orders for contracts expiring today
+      const pendingOptionOrders = await this.drizzle.db
+        .select()
+        .from(orders)
+        .where(and(inArray(orders.status, ['pending', 'partially_filled']), eq(orders.assetClass, 'option')));
+
+      for (const order of pendingOptionOrders) {
+        const parsed = parseOptionSymbol(order.symbol);
+        if (parsed && parsed.expiration === todayET) {
+          await this.drizzle.db
+            .update(orders)
+            .set({
+              status: 'expired',
+              expiredAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, order.id));
+        }
+      }
+
+      // Find all option positions expiring today
+      const expiringPositions = await this.drizzle.db.select().from(positions).where(eq(positions.expiration, todayET));
+
+      if (expiringPositions.length === 0) return;
+
+      // Get underlying quotes for ITM/OTM determination
+      const underlyings = [...new Set(expiringPositions.map((p) => p.underlyingSymbol!).filter(Boolean))];
+      const quotes = underlyings.length > 0 ? await this.marketDataService.getQuotes(underlyings) : {};
+
+      for (const pos of expiringPositions) {
+        try {
+          const underlying = quotes[pos.underlyingSymbol!];
+          if (!underlying) continue;
+
+          const qty = new Decimal(pos.quantity);
+          const strike = new Decimal(pos.strikePrice!);
+          const underlyingPrice = qty.gt(0) ? new Decimal(underlying.bidPrice) : new Decimal(underlying.askPrice);
+
+          const isCall = pos.optionType === 'call';
+          const isItm = isCall ? underlyingPrice.gt(strike) : underlyingPrice.lt(strike);
+
+          if (isItm) {
+            const intrinsicValue = isCall ? underlyingPrice.minus(strike) : strike.minus(underlyingPrice);
+            const closeSide = qty.gt(0) ? 'sell' : 'buy';
+            const absQty = qty.abs();
+
+            const [closeOrder] = await this.drizzle.db
+              .insert(orders)
+              .values({
+                cuidUserId: pos.cuidUserId,
+                symbol: pos.symbol,
+                assetClass: 'option',
+                side: closeSide as 'buy' | 'sell',
+                type: 'market',
+                timeInForce: 'day',
+                quantity: absQty.toFixed(6),
+              })
+              .returning();
+
+            await this.orderEngine.executeFill({
+              orderId: closeOrder.id,
+              fillPrice: intrinsicValue,
+              fillQuantity: absQty,
+              multiplier: OPTIONS_MULTIPLIER,
+            });
+          } else {
+            // OTM: expires worthless — delete position
+            await this.drizzle.db.delete(positions).where(eq(positions.id, pos.id));
+          }
+
+          this.eventEmitter.emit('option.expired', {
+            cuidUserId: pos.cuidUserId,
+            symbol: pos.symbol,
+            quantity: pos.quantity,
+            result: isItm ? 'itm_closed' : 'otm_expired',
+            underlyingPrice: underlyingPrice.toFixed(4),
+            strikePrice: pos.strikePrice,
+          });
+        } catch (error) {
+          this.logger.error(
+            `Option expiration error for ${pos.symbol}: ${error instanceof Error ? error.message : error}`,
+          );
+        }
+      }
+
+      this.logger.log(`Option expirations: processed ${expiringPositions.length} positions`);
+    } catch (error) {
+      this.logger.error(`Option expiration error: ${error instanceof Error ? error.message : error}`);
+    } finally {
+      this.unlock('optionExpirations');
     }
   }
 

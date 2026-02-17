@@ -3,8 +3,11 @@ import {
   BORROW_RATE_MODERATE,
   INITIAL_MARGIN_REQUIREMENT,
   isCryptoSymbol,
+  isOptionSymbol,
+  OPTIONS_MULTIPLIER,
   OrderSide,
   OrderType,
+  parseOptionSymbol,
 } from '@algoarena/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -25,6 +28,7 @@ interface FillParams {
   orderId: string;
   fillPrice: Decimal;
   fillQuantity: Decimal;
+  multiplier?: number; // defaults to 1
 }
 
 @Injectable()
@@ -69,7 +73,8 @@ export class OrderEngineService {
       // 4. Re-check buying power at fill time
       const cash = new Decimal(user.cashBalance);
       const marginUsed = new Decimal(user.marginUsed);
-      const totalCost = fillPrice.mul(fillQuantity);
+      const multiplier = new Decimal(params.multiplier ?? 1);
+      const totalCost = fillPrice.mul(fillQuantity).mul(multiplier);
       const currentPositionQty = existingPosition ? new Decimal(existingPosition.quantity) : new Decimal(0);
 
       // Determine if this is a short sell or a cover
@@ -199,19 +204,20 @@ export class OrderEngineService {
         existingPosition,
       );
 
-      // 9. Handle borrows (short open/close — equities only)
-      const newMarginUsed = isCryptoSymbol(order.symbol)
-        ? marginUsed
-        : await this.handleBorrows(
-            tx,
-            order.cuidUserId,
-            order.symbol.toUpperCase(),
-            order.side,
-            fillQuantity,
-            fillPrice,
-            currentPositionQty,
-            marginUsed,
-          );
+      // 9. Handle borrows (short open/close — equities only, skip crypto + options)
+      const newMarginUsed =
+        isCryptoSymbol(order.symbol) || isOptionSymbol(order.symbol)
+          ? marginUsed
+          : await this.handleBorrows(
+              tx,
+              order.cuidUserId,
+              order.symbol.toUpperCase(),
+              order.side,
+              fillQuantity,
+              fillPrice,
+              currentPositionQty,
+              marginUsed,
+            );
 
       // Write back cash + margin
       await tx
@@ -222,8 +228,8 @@ export class OrderEngineService {
         })
         .where(eq(cuidUsers.id, order.cuidUserId));
 
-      // 10. Record day trade if applicable (equities only)
-      if (!isCryptoSymbol(order.symbol)) {
+      // 10. Record day trade if applicable (equities only — skip crypto + options)
+      if (!isCryptoSymbol(order.symbol) && !isOptionSymbol(order.symbol)) {
         pdtCount = await this.pdtService.recordDayTradeIfApplicable(
           tx,
           order.cuidUserId,
@@ -519,14 +525,24 @@ export class OrderEngineService {
         })
         .where(eq(positions.id, positionId));
     } else {
+      const parsed = isOptionSymbol(symbol) ? parseOptionSymbol(symbol) : null;
       await tx.insert(positions).values({
         id: positionId,
         cuidUserId,
         symbol,
-        assetClass: isCryptoSymbol(symbol) ? 'crypto' : 'us_equity',
+        assetClass: isOptionSymbol(symbol) ? 'option' : isCryptoSymbol(symbol) ? 'crypto' : 'us_equity',
         quantity: newQty.toFixed(6),
         avgCostBasis: newAvgCostBasis?.toFixed(4),
         totalCostBasis: newTotalCostBasis?.toFixed(2),
+        ...(parsed
+          ? {
+              optionType: parsed.type,
+              strikePrice: parsed.strike,
+              expiration: parsed.expiration,
+              underlyingSymbol: parsed.underlying,
+              multiplier: String(OPTIONS_MULTIPLIER),
+            }
+          : {}),
       });
     }
   }

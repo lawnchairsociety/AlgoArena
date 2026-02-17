@@ -55,3 +55,12 @@ export interface PdtRestrictedPayload {
   dayTradeCount: number;
   equity: string;
 }
+
+export interface OptionExpiredPayload {
+  cuidUserId: string;
+  symbol: string;
+  quantity: string;
+  result: 'itm_closed' | 'otm_expired';
+  underlyingPrice: string;
+  strikePrice: string | null;
+}
