@@ -15,6 +15,7 @@ describe('TradingService', () => {
       null as any,
       null as any,
       null as any,
+      null as any,
     );
   });
 

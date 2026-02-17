@@ -14,6 +14,7 @@ describe('TradingService — trailing stop validation', () => {
       null as any,
       null as any,
       null as any,
+      null as any,
     );
   });
 

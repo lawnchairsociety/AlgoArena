@@ -14,6 +14,7 @@ describe('TradingService — bracket validation', () => {
       null as any,
       null as any,
       null as any,
+      null as any,
     );
   });
 

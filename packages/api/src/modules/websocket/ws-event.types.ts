@@ -71,3 +71,27 @@ export interface OptionExpiredPayload {
   underlyingPrice: string;
   strikePrice: string | null;
 }
+
+export interface RiskOrderRejectedPayload {
+  cuidUserId: string;
+  symbol: string;
+  violations: string[];
+}
+
+export interface RiskLossLimitPayload {
+  cuidUserId: string;
+  control: string;
+  dailyPnlPct: string;
+  limit: string;
+  action: string;
+  positionsClosed: number;
+  ordersCancelled: number;
+}
+
+export interface RiskWarningPayload {
+  cuidUserId: string;
+  control: string;
+  message: string;
+  currentValue: string;
+  limit: string;
+}

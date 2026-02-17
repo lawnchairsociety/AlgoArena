@@ -14,6 +14,7 @@ describe('TradingService — crypto validation', () => {
       null as any,
       null as any,
       null as any,
+      null as any,
     );
   });
 

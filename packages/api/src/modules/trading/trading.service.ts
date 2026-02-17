@@ -29,6 +29,7 @@ import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { OrderEngineService } from './order-engine.service';
 import { PdtService } from './pdt.service';
+import { RiskControlService } from './risk-control.service';
 
 @Injectable()
 export class TradingService {
@@ -42,11 +43,12 @@ export class TradingService {
     private readonly pdtService: PdtService,
     private readonly eventEmitter: EventEmitter2,
     private readonly sessionService: SessionService,
+    private readonly riskControlService: RiskControlService,
   ) {}
 
   // ── Public Methods ──
 
-  async placeOrder(cuidUserId: string, dto: PlaceOrderDto) {
+  async placeOrder(cuidUserId: string, dto: PlaceOrderDto, options?: { skipRiskControls?: boolean }) {
     // 0a. Multi-leg dispatch
     if (dto.orderClass === 'multileg' && dto.legs) {
       return this.placeMultiLegOrder(cuidUserId, dto);
@@ -125,6 +127,21 @@ export class TradingService {
 
     const currentPositionQty = existingPosition ? new Decimal(existingPosition.quantity) : new Decimal(0);
     const fillQuantity = new Decimal(dto.quantity);
+
+    // 4b. Risk control checks
+    if (!options?.skipRiskControls) {
+      const totalEquity = await this.computeEquity(user);
+      await this.riskControlService.validateOrder(cuidUserId, {
+        dto,
+        user,
+        existingPosition,
+        quote,
+        totalEquity,
+        isOption,
+        isCrypto,
+        effectiveMultiplier,
+      });
+    }
 
     // 5. Determine intent
     const isShortSell = dto.side === 'sell' && (currentPositionQty.lte(0) || fillQuantity.gt(currentPositionQty));
