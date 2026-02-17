@@ -1,5 +1,32 @@
 import { ORDER_SIDES, ORDER_TYPES, OrderSide, OrderType, TIME_IN_FORCE_VALUES, TimeInForce } from '@algoarena/shared';
-import { IsIn, IsNotEmpty, IsNumberString, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsIn, IsNotEmpty, IsNumberString, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+
+export class TakeProfitDto {
+  @IsNumberString()
+  limitPrice!: string;
+}
+
+export class StopLossDto {
+  @IsNumberString()
+  stopPrice!: string;
+
+  @IsOptional()
+  @IsNumberString()
+  limitPrice?: string;
+}
+
+export class BracketDto {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TakeProfitDto)
+  takeProfit?: TakeProfitDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StopLossDto)
+  stopLoss?: StopLossDto;
+}
 
 export class PlaceOrderDto {
   @IsString()
@@ -33,4 +60,13 @@ export class PlaceOrderDto {
 
   @IsIn([...TIME_IN_FORCE_VALUES])
   timeInForce!: TimeInForce;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BracketDto)
+  bracket?: BracketDto;
+
+  @IsOptional()
+  @IsUUID()
+  ocoLinkedTo?: string;
 }

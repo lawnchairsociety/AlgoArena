@@ -236,9 +236,48 @@ export class OrderEngineService {
       }
     });
 
-    // Emit events after transaction commits
+    // === Bracket child creation + OCO cancellation (on full fill) ===
+    let bracketChildren: { takeProfitOrderId?: string; stopLossOrderId?: string } | undefined;
+    let cancelledLinkedOrder: typeof orders.$inferSelect | null = null;
+
+    if (eventType === 'order.filled') {
+      const [filledOrder] = await this.drizzle.db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+
+      if (filledOrder) {
+        // Create bracket children if this is a bracket entry
+        if (filledOrder.bracketRole === 'entry' && filledOrder.bracketGroupId) {
+          bracketChildren = await this.createBracketChildren(filledOrder);
+        }
+
+        // Cancel OCO-linked order
+        if (filledOrder.linkedOrderId) {
+          cancelledLinkedOrder = await this.cancelOcoLinkedOrder(filledOrder);
+        }
+      }
+    }
+
+    // Emit fill event (with bracket info if applicable)
     if (eventType && orderEventPayload) {
-      this.eventEmitter.emit(eventType, orderEventPayload);
+      const payload = orderEventPayload as OrderEventPayload;
+      if (bracketChildren) {
+        payload.bracket = bracketChildren;
+      }
+      this.eventEmitter.emit(eventType, payload);
+    }
+
+    // Emit OCO cancel event for the linked order
+    if (cancelledLinkedOrder) {
+      this.eventEmitter.emit('order.cancelled', {
+        cuidUserId: cancelledLinkedOrder.cuidUserId,
+        orderId: cancelledLinkedOrder.id,
+        symbol: cancelledLinkedOrder.symbol,
+        side: cancelledLinkedOrder.side,
+        type: cancelledLinkedOrder.type,
+        quantity: cancelledLinkedOrder.quantity,
+        status: 'cancelled',
+        bracketRole: cancelledLinkedOrder.bracketRole,
+        bracketGroupId: cancelledLinkedOrder.bracketGroupId,
+      } satisfies OrderEventPayload);
     }
 
     if (pdtCount !== null && pdtCount === 2 && eventCuidUserId) {
@@ -305,6 +344,92 @@ export class OrderEngineService {
   }
 
   // ── Private Methods ──
+
+  private async createBracketChildren(
+    entryOrder: typeof orders.$inferSelect,
+  ): Promise<{ takeProfitOrderId?: string; stopLossOrderId?: string }> {
+    const oppositeSide = entryOrder.side === 'buy' ? 'sell' : 'buy';
+    const result: { takeProfitOrderId?: string; stopLossOrderId?: string } = {};
+    let tpOrderId: string | undefined;
+    let slOrderId: string | undefined;
+
+    if (entryOrder.takeProfitLimitPrice) {
+      const [tpOrder] = await this.drizzle.db
+        .insert(orders)
+        .values({
+          cuidUserId: entryOrder.cuidUserId,
+          symbol: entryOrder.symbol,
+          assetClass: entryOrder.assetClass,
+          side: oppositeSide,
+          type: 'limit',
+          quantity: entryOrder.filledQuantity,
+          limitPrice: entryOrder.takeProfitLimitPrice,
+          timeInForce: 'gtc',
+          parentOrderId: entryOrder.id,
+          bracketGroupId: entryOrder.bracketGroupId,
+          bracketRole: 'take_profit',
+        })
+        .returning();
+      tpOrderId = tpOrder.id;
+      result.takeProfitOrderId = tpOrder.id;
+    }
+
+    if (entryOrder.stopLossStopPrice) {
+      const slType = entryOrder.stopLossLimitPrice ? 'stop_limit' : 'stop';
+      const [slOrder] = await this.drizzle.db
+        .insert(orders)
+        .values({
+          cuidUserId: entryOrder.cuidUserId,
+          symbol: entryOrder.symbol,
+          assetClass: entryOrder.assetClass,
+          side: oppositeSide,
+          type: slType,
+          quantity: entryOrder.filledQuantity,
+          stopPrice: entryOrder.stopLossStopPrice,
+          limitPrice: entryOrder.stopLossLimitPrice ?? null,
+          timeInForce: 'gtc',
+          parentOrderId: entryOrder.id,
+          bracketGroupId: entryOrder.bracketGroupId,
+          bracketRole: 'stop_loss',
+        })
+        .returning();
+      slOrderId = slOrder.id;
+      result.stopLossOrderId = slOrder.id;
+    }
+
+    // Link TP ↔ SL as OCO pair
+    if (tpOrderId && slOrderId) {
+      await this.drizzle.db.update(orders).set({ linkedOrderId: slOrderId }).where(eq(orders.id, tpOrderId));
+      await this.drizzle.db.update(orders).set({ linkedOrderId: tpOrderId }).where(eq(orders.id, slOrderId));
+    }
+
+    return result;
+  }
+
+  private async cancelOcoLinkedOrder(
+    filledOrder: typeof orders.$inferSelect,
+  ): Promise<typeof orders.$inferSelect | null> {
+    if (!filledOrder.linkedOrderId) return null;
+
+    const [linked] = await this.drizzle.db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, filledOrder.linkedOrderId))
+      .limit(1);
+
+    if (!linked || (linked.status !== 'pending' && linked.status !== 'partially_filled')) return null;
+
+    await this.drizzle.db
+      .update(orders)
+      .set({
+        status: 'cancelled',
+        cancelledAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, linked.id));
+
+    return linked;
+  }
 
   private async updatePosition(
     tx: Tx,

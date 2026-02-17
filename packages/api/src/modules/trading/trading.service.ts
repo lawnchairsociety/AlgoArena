@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   CRYPTO_ALLOWED_ORDER_TYPES,
   CRYPTO_ALLOWED_TIF,
@@ -179,10 +180,43 @@ export class TradingService {
         stopPrice: dto.stopPrice ?? null,
         trailPercent: dto.trailPercent ?? null,
         trailPrice: dto.trailPrice ?? null,
+        ...(dto.bracket
+          ? {
+              bracketGroupId: randomUUID(),
+              bracketRole: 'entry',
+              takeProfitLimitPrice: dto.bracket.takeProfit?.limitPrice ?? null,
+              stopLossStopPrice: dto.bracket.stopLoss?.stopPrice ?? null,
+              stopLossLimitPrice: dto.bracket.stopLoss?.limitPrice ?? null,
+            }
+          : {}),
       })
       .returning();
 
-    // 9b. Compute HWM for trailing stops
+    // 9b. OCO linking
+    if (dto.ocoLinkedTo) {
+      const [linkedOrder] = await this.drizzle.db
+        .select()
+        .from(orders)
+        .where(and(eq(orders.id, dto.ocoLinkedTo), eq(orders.cuidUserId, cuidUserId)))
+        .limit(1);
+
+      if (!linkedOrder) throw new NotFoundException('Linked OCO order not found');
+      if (linkedOrder.status !== 'pending' && linkedOrder.status !== 'partially_filled') {
+        throw new BadRequestException('Linked OCO order must be pending or partially_filled');
+      }
+      if (linkedOrder.symbol !== normalizedSymbol) {
+        throw new BadRequestException('OCO linked orders must be for the same symbol');
+      }
+      if (linkedOrder.linkedOrderId) {
+        throw new BadRequestException('Target order is already linked to another OCO order');
+      }
+
+      // Bidirectional link
+      await this.drizzle.db.update(orders).set({ linkedOrderId: order.id }).where(eq(orders.id, linkedOrder.id));
+      await this.drizzle.db.update(orders).set({ linkedOrderId: linkedOrder.id }).where(eq(orders.id, order.id));
+    }
+
+    // 9c. Compute HWM for trailing stops
     if (dto.type === 'trailing_stop') {
       const bidPrice = new Decimal(quote.bidPrice);
       const hwm = bidPrice;
@@ -388,6 +422,11 @@ export class TradingService {
         `Time in force '${dto.timeInForce}' is not supported for crypto. Allowed: ${CRYPTO_ALLOWED_TIF.join(', ')}`,
       );
     }
+    if (dto.bracket?.stopLoss && !dto.bracket.stopLoss.limitPrice) {
+      throw new BadRequestException(
+        'Crypto bracket stopLoss requires limitPrice (stop_limit). Bare stop is not supported for crypto.',
+      );
+    }
   }
 
   private validateOrderDto(dto: PlaceOrderDto): void {
@@ -464,6 +503,42 @@ export class TradingService {
         throw new BadRequestException('stopPrice must be greater than 0');
       }
     }
+
+    // Bracket validation
+    if (dto.bracket) {
+      if (dto.type === 'trailing_stop') {
+        throw new BadRequestException('bracket cannot be combined with trailing_stop orders');
+      }
+      if (!dto.bracket.takeProfit && !dto.bracket.stopLoss) {
+        throw new BadRequestException('bracket must include at least takeProfit or stopLoss');
+      }
+      if (dto.bracket.takeProfit) {
+        const tp = new Decimal(dto.bracket.takeProfit.limitPrice);
+        if (tp.lte(0)) throw new BadRequestException('bracket.takeProfit.limitPrice must be > 0');
+      }
+      if (dto.bracket.stopLoss) {
+        const sl = new Decimal(dto.bracket.stopLoss.stopPrice);
+        if (sl.lte(0)) throw new BadRequestException('bracket.stopLoss.stopPrice must be > 0');
+        if (dto.bracket.stopLoss.limitPrice) {
+          const slLimit = new Decimal(dto.bracket.stopLoss.limitPrice);
+          if (slLimit.lte(0)) throw new BadRequestException('bracket.stopLoss.limitPrice must be > 0');
+        }
+      }
+      if (dto.bracket.takeProfit && dto.bracket.stopLoss) {
+        const tp = new Decimal(dto.bracket.takeProfit.limitPrice);
+        const sl = new Decimal(dto.bracket.stopLoss.stopPrice);
+        if (dto.side === 'buy' && tp.lte(sl)) {
+          throw new BadRequestException('For buy bracket: takeProfit.limitPrice must be > stopLoss.stopPrice');
+        }
+        if (dto.side === 'sell' && tp.gte(sl)) {
+          throw new BadRequestException('For sell bracket: takeProfit.limitPrice must be < stopLoss.stopPrice');
+        }
+      }
+    }
+
+    if (dto.ocoLinkedTo && dto.bracket) {
+      throw new BadRequestException('Cannot combine bracket and ocoLinkedTo');
+    }
   }
 
   private async rejectOrder(orderId: string, reason: string): Promise<void> {
@@ -512,6 +587,24 @@ export class TradingService {
       .where(and(eq(orders.id, orderId), eq(orders.cuidUserId, cuidUserId)))
       .limit(1);
 
-    return order ?? null;
+    if (!order) return null;
+
+    // If bracket entry, include child order IDs
+    if (order.bracketRole === 'entry' && order.bracketGroupId) {
+      const children = await this.drizzle.db
+        .select({ id: orders.id, bracketRole: orders.bracketRole })
+        .from(orders)
+        .where(eq(orders.parentOrderId, order.id));
+
+      const bracket: { takeProfitOrderId?: string; stopLossOrderId?: string } = {};
+      for (const child of children) {
+        if (child.bracketRole === 'take_profit') bracket.takeProfitOrderId = child.id;
+        if (child.bracketRole === 'stop_loss') bracket.stopLossOrderId = child.id;
+      }
+
+      return { ...order, bracket: children.length > 0 ? bracket : undefined };
+    }
+
+    return order;
   }
 }

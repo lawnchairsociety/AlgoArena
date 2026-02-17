@@ -20,6 +20,14 @@ export const orders = pgTable('orders', {
   trailPrice: numeric('trail_price', { precision: 12, scale: 4 }),
   highWaterMark: numeric('high_water_mark', { precision: 12, scale: 4 }),
   trailingStopPrice: numeric('trailing_stop_price', { precision: 12, scale: 4 }),
+  // Bracket / OCO fields
+  parentOrderId: uuid('parent_order_id'),
+  bracketGroupId: uuid('bracket_group_id'),
+  bracketRole: text('bracket_role'), // 'entry' | 'take_profit' | 'stop_loss'
+  linkedOrderId: uuid('linked_order_id'), // OCO partner (TP ↔ SL)
+  takeProfitLimitPrice: numeric('take_profit_limit_price', { precision: 14, scale: 4 }),
+  stopLossStopPrice: numeric('stop_loss_stop_price', { precision: 14, scale: 4 }),
+  stopLossLimitPrice: numeric('stop_loss_limit_price', { precision: 14, scale: 4 }),
   avgFillPrice: numeric('avg_fill_price', { precision: 14, scale: 4 }),
   status: orderStatusEnum('status').notNull().default('pending'),
   rejectionReason: text('rejection_reason'),

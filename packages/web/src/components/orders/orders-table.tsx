@@ -61,7 +61,14 @@ export function OrdersTable({ orders, isLoading, selectedOrderId, onSelectOrder 
                         {order.side}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs hidden sm:table-cell">{order.type.replace('_', ' ')}</TableCell>
+                    <TableCell className="text-xs hidden sm:table-cell">
+                      {order.type.replace('_', ' ')}
+                      {order.bracketRole && (
+                        <Badge variant="outline" className="ml-1 text-[10px]">
+                          {order.bracketRole === 'entry' ? 'bracket' : order.bracketRole.replace('_', ' ')}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs uppercase hidden lg:table-cell">{order.timeInForce}</TableCell>
                     <TableCell className="text-right font-mono">{formatQuantity(order.quantity)}</TableCell>
                     <TableCell className="text-right font-mono hidden sm:table-cell">

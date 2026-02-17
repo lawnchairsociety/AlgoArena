@@ -228,6 +228,68 @@ Content-Type: application/json
           </p>
         </Section>
 
+        <Section title="Bracket Orders (OTO / OCO)">
+          <p className="text-muted-foreground mb-3">
+            Bracket orders let you attach take-profit and/or stop-loss exits to any entry order. When the entry fills,
+            the server automatically creates child exit orders and links them as an OCO pair.
+          </p>
+
+          <h3 className="font-semibold mb-2">Request Format</h3>
+          <Code>{`POST /api/v1/trading/orders
+Headers: x-algoarena-api-key, x-algoarena-cuid
+Content-Type: application/json
+
+{
+  "symbol": "AAPL",
+  "side": "buy",
+  "type": "market",
+  "quantity": "10",
+  "timeInForce": "day",
+  "bracket": {
+    "takeProfit": { "limitPrice": "200.00" },
+    "stopLoss": { "stopPrice": "170.00" }
+  }
+}`}</Code>
+
+          <h3 className="font-semibold mb-2 mt-4">Rules</h3>
+          <div className="text-muted-foreground space-y-1 mb-3">
+            <p>
+              Optional on any order type except <code>trailing_stop</code>
+            </p>
+            <p>
+              At least one of <code>takeProfit</code> or <code>stopLoss</code> required in bracket
+            </p>
+            <p>Children auto-created on full fill (opposite side, GTC)</p>
+            <p>OCO behavior: when one child fills, the other is cancelled</p>
+            <p>
+              Buy bracket: <code>takeProfit.limitPrice</code> must be {'>'} <code>stopLoss.stopPrice</code>
+            </p>
+            <p>
+              Sell bracket: <code>takeProfit.limitPrice</code> must be {'<'} <code>stopLoss.stopPrice</code>
+            </p>
+          </div>
+
+          <h3 className="font-semibold mb-2">Stop-Limit Exit</h3>
+          <Code>{`"stopLoss": { "stopPrice": "170.00", "limitPrice": "169.50" }`}</Code>
+
+          <h3 className="font-semibold mb-2 mt-4">Standalone OCO</h3>
+          <p className="text-muted-foreground mb-2">
+            Link any two pending orders as an OCO pair using <code>ocoLinkedTo</code>:
+          </p>
+          <Code>{`{
+  "symbol": "AAPL",
+  "side": "sell",
+  "type": "limit",
+  "quantity": "10",
+  "limitPrice": "200.00",
+  "timeInForce": "gtc",
+  "ocoLinkedTo": "existing-order-uuid"
+}`}</Code>
+          <p className="text-muted-foreground text-sm mt-2">
+            Crypto note: <code>stopLoss</code> requires <code>limitPrice</code> (stop_limit) for crypto assets.
+          </p>
+        </Section>
+
         <Section title="Portfolio">
           <Code>{`# Account summary (cash, equity, P&L, PDT status)
 GET /api/v1/portfolio/account
@@ -356,6 +418,11 @@ heartbeat               — every 30 seconds`}</Code>
             <p>
               <strong>Short selling:</strong> Supported with 50% initial margin, 25% maintenance margin, and tiered
               borrow fees.
+            </p>
+            <p>
+              <strong>Bracket orders (OTO/OCO):</strong> Attach <code>bracket.takeProfit</code> and/or{' '}
+              <code>bracket.stopLoss</code> to any order (except trailing_stop). Children are created on full fill and
+              linked as OCO — when one fills, the other is cancelled.
             </p>
             <p>
               <strong>Fractional shares:</strong> Quantities support up to 6 decimal places.
