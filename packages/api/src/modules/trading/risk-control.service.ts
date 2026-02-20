@@ -358,8 +358,11 @@ export class RiskControlService {
       }
     }
 
-    // 7. Daily loss limit
-    if (controls.maxDailyLossPct !== null && totalEquity.gt(0)) {
+    // Detect if this sell order is closing/reducing an existing long position
+    const isClosingLong = dto.side === 'sell' && currentPositionQty.gt(0) && fillQuantity.lte(currentPositionQty);
+
+    // 7. Daily loss limit (skip for sells closing existing positions — must allow exits)
+    if (controls.maxDailyLossPct !== null && totalEquity.gt(0) && !isClosingLong) {
       const startingBalance = new Decimal(params.user.startingBalance);
       const dailyPnlPct = totalEquity.minus(startingBalance).div(startingBalance);
       if (dailyPnlPct.lt(0) && dailyPnlPct.abs().gte(new Decimal(controls.maxDailyLossPct))) {
@@ -376,8 +379,8 @@ export class RiskControlService {
       }
     }
 
-    // 8. Drawdown
-    if (controls.maxDrawdownPct !== null && totalEquity.gt(0)) {
+    // 8. Drawdown (skip for sells closing existing positions — must allow exits)
+    if (controls.maxDrawdownPct !== null && totalEquity.gt(0) && !isClosingLong) {
       const startingBalance = new Decimal(params.user.startingBalance);
       const peakSnapshot = await this.drizzle.db
         .select({ totalEquity: portfolioSnapshots.totalEquity })
