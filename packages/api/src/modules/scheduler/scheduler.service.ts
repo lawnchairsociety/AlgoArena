@@ -286,8 +286,16 @@ export class SchedulerService {
         const totalEquity = cash.plus(positionsValue);
         const totalPnl = totalEquity.minus(startingBalance);
 
-        // dayPnl: difference from previous snapshot or startingBalance
-        const dayPnl = totalPnl; // simplified: total PnL since inception
+        // dayPnl: difference from previous snapshot (yesterday's close)
+        const prevSnap = await this.drizzle.db
+          .select({ totalEquity: portfolioSnapshots.totalEquity })
+          .from(portfolioSnapshots)
+          .where(eq(portfolioSnapshots.cuidUserId, user.id))
+          .orderBy(desc(portfolioSnapshots.snapshotDate))
+          .limit(1);
+
+        const prevEquity = prevSnap.length > 0 ? new Decimal(prevSnap[0].totalEquity) : startingBalance;
+        const dayPnl = totalEquity.minus(prevEquity);
 
         snapshots.push({
           cuidUserId: user.id,
@@ -727,9 +735,17 @@ export class SchedulerService {
 
           const totalEquity = cash.plus(positionsValue);
 
-          // Check daily loss
+          // Check daily loss (compare to previous day's closing snapshot)
           if (rc.maxDailyLossPct !== null) {
-            const dailyPnlPct = totalEquity.minus(startingBalance).div(startingBalance);
+            const prevSnap = await this.drizzle.db
+              .select({ totalEquity: portfolioSnapshots.totalEquity })
+              .from(portfolioSnapshots)
+              .where(eq(portfolioSnapshots.cuidUserId, rc.userId))
+              .orderBy(desc(portfolioSnapshots.snapshotDate))
+              .limit(1);
+
+            const dailyBaseline = prevSnap.length > 0 ? new Decimal(prevSnap[0].totalEquity) : startingBalance;
+            const dailyPnlPct = totalEquity.minus(dailyBaseline).div(dailyBaseline);
             const maxLoss = new Decimal(rc.maxDailyLossPct);
 
             if (dailyPnlPct.lt(0) && dailyPnlPct.abs().gte(maxLoss)) {
