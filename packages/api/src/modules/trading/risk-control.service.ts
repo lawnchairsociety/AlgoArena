@@ -75,7 +75,7 @@ export class RiskControlService {
   async getControlsWithStatus(userId: string) {
     const controls = await this.getControls(userId);
 
-    const todayStart = this.getTodayStartUTC();
+    const todayStart = this.getTodayStartET();
 
     // Daily trade count + notional
     const todayFills = await this.drizzle.db
@@ -117,8 +117,18 @@ export class RiskControlService {
     }
 
     const totalEquity = cash.plus(totalPositionsValue);
-    const totalPnl = totalEquity.minus(startingBalance);
-    const dailyPnlPct = startingBalance.gt(0) ? totalPnl.div(startingBalance) : new Decimal(0);
+
+    // Daily PnL: compare to most recent snapshot (previous close), not starting balance
+    const prevSnapshot = await this.drizzle.db
+      .select({ totalEquity: portfolioSnapshots.totalEquity })
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.cuidUserId, userId))
+      .orderBy(desc(portfolioSnapshots.snapshotDate))
+      .limit(1);
+
+    const dailyBaseline = prevSnapshot.length > 0 ? new Decimal(prevSnapshot[0].totalEquity) : startingBalance;
+    const dailyPnl = totalEquity.minus(dailyBaseline);
+    const dailyPnlPct = dailyBaseline.gt(0) ? dailyPnl.div(dailyBaseline) : new Decimal(0);
 
     if (totalEquity.gt(0)) {
       for (const pos of userPositions) {
@@ -176,7 +186,7 @@ export class RiskControlService {
       status: {
         dailyTradeCount,
         dailyNotional,
-        dailyPnl: totalPnl.toFixed(2),
+        dailyPnl: dailyPnl.toFixed(2),
         dailyPnlPct: dailyPnlPct.toFixed(6),
         currentDrawdown: currentDrawdown.toFixed(6),
         shortExposurePct: shortExposurePct.toFixed(6),
@@ -328,7 +338,7 @@ export class RiskControlService {
 
     // 5. Daily trade count
     if (controls.maxDailyTrades !== null) {
-      const todayStart = this.getTodayStartUTC();
+      const todayStart = this.getTodayStartET();
       const todayFills = await this.drizzle.db
         .select({ count: sql<number>`count(*)::int` })
         .from(fills)
@@ -341,7 +351,7 @@ export class RiskControlService {
 
     // 6. Daily notional
     if (controls.maxDailyNotional !== null) {
-      const todayStart = this.getTodayStartUTC();
+      const todayStart = this.getTodayStartET();
       const todayNotional = await this.drizzle.db
         .select({
           total: sql<string>`coalesce(sum(abs(${fills.totalCost}::numeric)), 0)::text`,
@@ -363,8 +373,17 @@ export class RiskControlService {
 
     // 7. Daily loss limit (skip for sells closing existing positions — must allow exits)
     if (controls.maxDailyLossPct !== null && totalEquity.gt(0) && !isClosingLong) {
-      const startingBalance = new Decimal(params.user.startingBalance);
-      const dailyPnlPct = totalEquity.minus(startingBalance).div(startingBalance);
+      // Compare to previous day's closing snapshot, not starting balance
+      const prevSnapshot = await this.drizzle.db
+        .select({ totalEquity: portfolioSnapshots.totalEquity })
+        .from(portfolioSnapshots)
+        .where(eq(portfolioSnapshots.cuidUserId, userId))
+        .orderBy(desc(portfolioSnapshots.snapshotDate))
+        .limit(1);
+
+      const dailyBaseline =
+        prevSnapshot.length > 0 ? new Decimal(prevSnapshot[0].totalEquity) : new Decimal(params.user.startingBalance);
+      const dailyPnlPct = totalEquity.minus(dailyBaseline).div(dailyBaseline);
       if (dailyPnlPct.lt(0) && dailyPnlPct.abs().gte(new Decimal(controls.maxDailyLossPct))) {
         if (controls.autoFlattenOnLoss) {
           this.eventEmitter.emit('risk.auto_flatten', {
@@ -525,8 +544,19 @@ export class RiskControlService {
 
   // ── Private Helpers ──
 
-  private getTodayStartUTC(): Date {
+  private getTodayStartET(): Date {
     const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const etDateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // YYYY-MM-DD
+    // Use Intl to get the correct UTC offset (handles EST/EDT automatically)
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      timeZoneName: 'shortOffset',
+    }).formatToParts(new Date(`${etDateStr}T00:00:00`));
+    const offsetPart = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT-5';
+    const offsetMatch = offsetPart.match(/GMT([+-]\d+)/);
+    const offsetHours = offsetMatch ? parseInt(offsetMatch[1], 10) : -5;
+    const sign = offsetHours >= 0 ? '+' : '-';
+    const abs = String(Math.abs(offsetHours)).padStart(2, '0');
+    return new Date(`${etDateStr}T00:00:00${sign}${abs}:00`);
   }
 }
