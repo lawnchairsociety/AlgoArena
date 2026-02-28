@@ -44,7 +44,7 @@
     "@nestjs/testing": "^11.1.14",
     "@types/bcrypt": "^6.0.0",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.13.4",
+    "@types/node": "^22.19.13",
     "@types/pg": "^8.11.11",
     "@types/supertest": "^6.0.3",
     "@types/ws": "^8.18.1",
