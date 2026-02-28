@@ -11,10 +11,10 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@tanstack/react-router": "^1.161.3",
+    "@tanstack/react-router": "^1.163.3",
     "@tanstack/react-query": "^5.65.0",
     "zustand": "^5.0.3",
-    "axios": "^1.7.9",
+    "axios": "^1.13.6",
     "recharts": "^2.15.1",
     "clsx": "^2.1.1",
     "tailwind-merge": "^3.5.0",
